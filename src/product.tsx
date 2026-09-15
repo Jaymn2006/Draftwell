@@ -677,7 +677,7 @@ function StoryDetailPage() {
 
   return (
     <div className="page story-detail-page">
-      <button className="back-btn" onClick={() => navigate(-1 as unknown as string)}><ArrowLeft size={16} /> Back</button>
+      <button className="back-btn" onClick={() => window.history.back()}><ArrowLeft size={16} /> Back</button>
       <div className="story-detail">
         <div className="story-detail__cover">
           <StoryCover story={story} size="lg" />
@@ -1137,7 +1137,7 @@ function AuthorPage() {
 
   return (
     <div className="page author-page">
-      <button className="back-btn" onClick={() => navigate(-1 as unknown as string)}><ArrowLeft size={16} /> Back</button>
+      <button className="back-btn" onClick={() => window.history.back()}><ArrowLeft size={16} /> Back</button>
       <div className="author-hero">
         <div className="avatar avatar--xl">{authorName.slice(0, 2).toUpperCase()}</div>
         <div className="author-hero__info">
@@ -1679,7 +1679,7 @@ function StoryEditor() {
   const { route, navigate, getStory, saveStory, settings } = useApp()
   const { success, error } = useToast()
   const storyId = route.replace('/studio/edit/', '').replace('/studio/write/', '')
-  const story = getStory(storyId)
+  const rawStory = getStory(storyId)
   const [activeChIdx, setActiveChIdx] = useState(0)
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const saveTimer = useRef<number | null>(null)
@@ -1690,10 +1690,12 @@ function StoryEditor() {
   const speechRestartRef = useRef<number | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
 
-  if (!story) return (
+  if (!rawStory) return (
     <div className="page"><button className="back-btn" onClick={() => navigate('/studio')}><ArrowLeft size={16} /> Studio</button>
       <EmptyState icon={BookOpen} title="Story not found" text="This story no longer exists." action="Go to Studio" onAction={() => navigate('/studio')} /></div>
   )
+
+  const story = rawStory
 
   const chapter: Chapter | undefined = story.chapters[activeChIdx]
 
@@ -1770,10 +1772,19 @@ function StoryEditor() {
       rec.onerror = (e: any) => { if (e?.error === 'not-allowed') { speechSessionRef.current = false; setIsRecording(false); error('Microphone denied') } }
       rec.onresult = (e: any) => {
         let fin = ''; let interim = ''
-        for (let i = 0; i < e.results.length; i++) { const r = e.results[i]; (r.isFinal ? fin : interim) + r[0].transcript }
-        const body = speechBaseRef.current + (speechBaseRef.current.trim() ? '\n\n' : '') + (fin + ' ' + interim).trim()
+        for (let i = 0; i < e.results.length; i++) {
+          const r = e.results[i]
+          if (r.isFinal) fin += r[0].transcript
+          else interim += r[0].transcript
+        }
+        const combined = fin + (interim ? ' ' + interim : '')
+        if (!combined.trim()) return
+        const sep = speechBaseRef.current.trim() ? '\n\n' : ''
+        const body = speechBaseRef.current + sep + combined.trim()
         updateChapter({ body })
-        if (fin) speechBaseRef.current = speechBaseRef.current + (speechBaseRef.current.trim() ? '\n\n' : '') + fin.trim()
+        if (fin) {
+          speechBaseRef.current = speechBaseRef.current + (speechBaseRef.current.trim() ? '\n\n' : '') + fin.trim()
+        }
       }
       try { rec.start() } catch { speechRestartRef.current = window.setTimeout(startRec, 500) }
     }
