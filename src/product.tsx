@@ -195,6 +195,7 @@ export function ProductShell() {
                 <div className="dropdown__divider" />
                 <button role="menuitem" className="dropdown__item--danger" onClick={() => {
                   setProfileMenuOpen(false)
+                  if (supabase) void supabase.auth.signOut()
                   localStorage.removeItem('draftwell-offline-mode')
                   app.setAuthenticated(false); app.setUserId(null)
                 }}><LogOut size={15} /> Sign out</button>
@@ -1765,7 +1766,7 @@ function StoryEditor() {
       recognitionRef.current = rec
       rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US'
       rec.onstart = () => setIsRecording(true)
-      rec.onend = () => { if (speechSessionRef.current) speechRestartRef.current = window.setTimeout(startRec, 150) else setIsRecording(false) }
+      rec.onend = () => { if (speechSessionRef.current) { speechRestartRef.current = window.setTimeout(startRec, 150) } else { setIsRecording(false) } }
       rec.onerror = (e: any) => { if (e?.error === 'not-allowed') { speechSessionRef.current = false; setIsRecording(false); error('Microphone denied') } }
       rec.onresult = (e: any) => {
         let fin = ''; let interim = ''
