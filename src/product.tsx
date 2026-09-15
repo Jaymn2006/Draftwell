@@ -1661,7 +1661,7 @@ function CreateStoryView() {
                 style={{ background: c }} aria-label={`Cover color ${c}`} onClick={() => setCoverColor(c)} />
             ))}
           </div>
-          <div className="cover-preview"><StoryCover story={{ id: '', userId: '', title: title || 'Your Story', author: author || 'You', description: '', genre, tags: [], status: 'Draft', coverColor, chapters: [], totalWords: 0, isOwn: true, createdAt: 0, updatedAt: 0 }} size="md" /></div>
+          <div className="cover-preview"><StoryCover story={{ id: 'preview', userId: '', title: title || 'Your Story', author: author || 'You', description: '', genre, tags: [], status: 'Draft' as const, coverColor, chapters: [], totalWords: 0, isOwn: true, createdAt: 0, updatedAt: 0 } as Story} size="md" /></div>
         </div>
         <div className="form-actions">
           <button type="button" className="btn btn--ghost" onClick={() => navigate('/studio')}>Cancel</button>
@@ -1708,7 +1708,7 @@ function StoryEditor() {
   function updateChapter(patch: Partial<Chapter>) {
     if (!chapter) return
     const updated = story.chapters.map((ch, i) => i === activeChIdx ? { ...ch, ...patch, wordCount: wc(patch.body ?? ch.body), updatedAt: Date.now() } : ch)
-    const updatedStory = { ...story, chapters: updated, totalWords: updated.reduce((a, c) => a + c.wordCount, 0), updatedAt: Date.now() }
+    const updatedStory: Story = { ...story, chapters: updated, totalWords: updated.reduce((a, c) => a + c.wordCount, 0), updatedAt: Date.now() }
     saveStory(updatedStory)
     setSyncStatus('unsaved')
     autosave(updatedStory)
@@ -1718,14 +1718,14 @@ function StoryEditor() {
     const id = `ch-${storyId}-${Date.now()}`
     const num = story.chapters.length + 1
     const newCh: Chapter = { id, storyId, number: num, title: `Chapter ${num}`, body: '', note: '', status: 'Outline', wordCount: 0, createdAt: Date.now(), updatedAt: Date.now() }
-    const updated = { ...story, chapters: [...story.chapters, newCh], updatedAt: Date.now() }
+    const updated: Story = { ...story, chapters: [...story.chapters, newCh], updatedAt: Date.now() }
     saveStory(updated)
     setActiveChIdx(story.chapters.length)
     success('Chapter added')
   }
 
   function deleteChapter(idx: number) {
-    const updated = { ...story, chapters: story.chapters.filter((_, i) => i !== idx).map((ch, i) => ({ ...ch, number: i + 1 })), updatedAt: Date.now() }
+    const updated: Story = { ...story, chapters: story.chapters.filter((_, i) => i !== idx).map((ch, i) => ({ ...ch, number: i + 1 })), updatedAt: Date.now() }
     saveStory(updated)
     setActiveChIdx(Math.min(idx, updated.chapters.length - 1))
     success('Chapter deleted')
@@ -1736,16 +1736,17 @@ function StoryEditor() {
     if (target < 0 || target >= story.chapters.length) return
     const chs = [...story.chapters]
     ;[chs[idx], chs[target]] = [chs[target], chs[idx]]
-    const updated = { ...story, chapters: chs.map((ch, i) => ({ ...ch, number: i + 1 })), updatedAt: Date.now() }
+    const updated: Story = { ...story, chapters: chs.map((ch, i) => ({ ...ch, number: i + 1 })), updatedAt: Date.now() }
     saveStory(updated)
     setActiveChIdx(target)
   }
 
   function publishChapter() {
     if (!chapter) return
-    updateChapter({ status: 'Published', publishedAt: Date.now() })
     const updatedStatus: Story['status'] = story.status === 'Draft' ? 'Ongoing' : story.status
-    saveStory({ ...story, status: updatedStatus })
+    const updatedChapters = story.chapters.map((ch, i) => i === activeChIdx ? { ...ch, status: 'Published' as const, publishedAt: Date.now(), wordCount: wc(ch.body), updatedAt: Date.now() } : ch)
+    const updatedStory: Story = { ...story, chapters: updatedChapters, status: updatedStatus, totalWords: updatedChapters.reduce((a, c) => a + c.wordCount, 0), updatedAt: Date.now() }
+    saveStory(updatedStory)
     success('Chapter published')
   }
 

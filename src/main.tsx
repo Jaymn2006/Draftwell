@@ -312,8 +312,9 @@ function App() {
   }, [introDone])
 
   // ── Auth ──────────────────────────────────────────────────────────────
+  // Start unauthenticated — always show login screen first unless in offline mode
   const [authenticated, setAuthenticated] = useState(
-    () => !isSupabaseConfigured || localStorage.getItem('draftwell-offline-mode') === 'true'
+    () => localStorage.getItem('draftwell-offline-mode') === 'true'
   )
   const [userId, setUserId] = useState<string | null>(
     () => localStorage.getItem('draftwell-offline-mode') === 'true' ? offlineUserId : null
@@ -321,19 +322,28 @@ function App() {
   const [privateReady, setPrivateReady] = useState(false)
 
   useEffect(() => {
-    if (!supabase) return
     if (localStorage.getItem('draftwell-offline-mode') === 'true') {
       setAuthenticated(true)
       setUserId(offlineUserId)
       return
     }
+    if (!supabase) {
+      // Supabase not configured — stay on auth screen so user can choose offline mode
+      return
+    }
     supabase.auth.getSession().then(({ data }) => {
-      setAuthenticated(Boolean(data.session))
-      setUserId(data.session?.user.id ?? null)
+      if (data.session) {
+        setAuthenticated(true)
+        setUserId(data.session.user.id)
+      } else {
+        // No session — show login screen
+        setAuthenticated(false)
+        setUserId(null)
+      }
     }).catch(() => {
-      // session check failed — let user continue offline
-      setAuthenticated(true)
-      setUserId(offlineUserId)
+      // Session check failed — show login screen, don't auto-bypass auth
+      setAuthenticated(false)
+      setUserId(null)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthenticated(Boolean(session))
