@@ -2,16 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Draftwell — a living home for stories, readers, and writers. Read, write, and publish original fiction." />
     <meta name="theme-color" content="#050b12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta property="og:title" content="Draftwell" />
     <meta property="og:description" content="A living home for stories, readers, and writers." />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23d88a2f' rx='4'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-size='22' font-weight='600' fill='%23fff9ef'>D</text></svg>" />
     <title>Draftwell — your voice, in print</title>
+    <!-- Offline fallback: if JS fails to load (file:// protocol or network error), show a styled page -->
+    <style>
+      #offline-fallback {
+        display: none;
+        position: fixed; inset: 0; z-index: 9999;
+        background: #050b12; color: #eef4f5;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        place-items: center; text-align: center; padding: 40px;
+      }
+      #offline-fallback h1 { font-size: 28px; margin: 0 0 12px; font-weight: 500; }
+      #offline-fallback p { color: #7a9aaa; font-size: 14px; line-height: 1.6; max-width: 380px; margin: 0 auto 24px; }
+      #offline-fallback .logo { width: 56px; height: 56px; background: #d88a2f; border-radius: 8px; display: grid; place-items: center; font-size: 32px; font-family: Georgia, serif; color: #fff9ef; margin: 0 auto 20px; }
+      #offline-fallback a { display: inline-block; padding: 11px 24px; background: #d88a2f; color: #fff9ef; border-radius: 8px; font-weight: 700; font-size: 13px; text-decoration: none; }
+    </style>
+    <noscript>
+      <style>#offline-fallback { display: grid !important; }</style>
+    </noscript>
   </head>
   <body>
+    <!-- Shown when JS is disabled or fails to load -->
+    <div id="offline-fallback">
+      <div class="logo">D</div>
+      <h1>Draftwell needs JavaScript</h1>
+      <p>Please enable JavaScript in your browser to use Draftwell, or open it through a web server rather than directly as a file.</p>
+      <a href="https://Jaymn2006.github.io/Draftwell/">Open Draftwell Online</a>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
