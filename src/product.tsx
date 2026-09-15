@@ -13,6 +13,7 @@ import {
 import { useApp } from './lib/context'
 import { useToast } from './lib/toast'
 import { DEMO_AUTHORS, DEMO_STORIES, GENRES } from './lib/demo'
+import { supabase } from './lib/supabase'
 import type { Chapter, Comment, ReaderTheme, Story, StoryStatus } from './lib/types'
 
 // ── Brand mark ────────────────────────────────────────────────────────────
@@ -1235,17 +1236,7 @@ function ProfilePage() {
         ))}
       </div>
       {myStories.length > 0 && (
-        <div className="profile-section">
-          <h2>My Stories</h2>
-          <div className="work-grid">{myStories.slice(0, 3).map((s) => {
-            const { isInLibrary, addToLibrary, removeFromLibrary } = useApp()
-            return <WorkCard key={s.id} story={s} onLibraryToggle={(st) => {
-              if (isInLibrary(st.id)) removeFromLibrary(st.id)
-              else addToLibrary(st.id)
-            }} />
-          })}</div>
-          {myStories.length > 3 && <button className="btn btn--ghost btn--sm" onClick={() => navigate('/studio/stories')}>View all stories</button>}
-        </div>
+        <ProfileStoriesSection myStories={myStories} navigate={navigate} />
       )}
     </div>
   )
@@ -2036,6 +2027,30 @@ function NotFoundPage() {
           <button className="btn btn--ghost" onClick={() => navigate('/discover')}>Explore Stories</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Profile stories section (avoids hook-in-callback) ────────────────────
+function ProfileStoriesSection({ myStories, navigate }: { myStories: Story[]; navigate: (r: string) => void }) {
+  const { isInLibrary, addToLibrary, removeFromLibrary } = useApp()
+  const { success } = useToast()
+  return (
+    <div className="profile-section">
+      <h2>My Stories</h2>
+      <div className="work-grid">
+        {myStories.slice(0, 3).map((s) => (
+          <WorkCard key={s.id} story={s} onLibraryToggle={(st) => {
+            if (isInLibrary(st.id)) { removeFromLibrary(st.id); success('Removed from library') }
+            else { addToLibrary(st.id); success('Added to library') }
+          }} />
+        ))}
+      </div>
+      {myStories.length > 3 && (
+        <button className="btn btn--ghost btn--sm" style={{ marginTop: 14 }} onClick={() => navigate('/studio/stories')}>
+          View all stories
+        </button>
+      )}
     </div>
   )
 }
