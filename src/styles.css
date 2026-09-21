@@ -549,6 +549,8 @@ button.tag:hover { border-color: var(--accent); color: var(--accent); }
   display: flex; flex-direction: column; justify-content: flex-end;
   position: relative;
   flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
 }
 .story-cover--sm  { width: 60px; height: 86px; border-radius: 6px; }
 .story-cover--md  { width: 100%; aspect-ratio: .7; }
@@ -915,6 +917,41 @@ button.tag:hover { border-color: var(--accent); color: var(--accent); }
 .reader-bar__chapter { display: block; font: 500 10px 'DM Mono', monospace; color: var(--muted); margin-top: 1px; }
 .reader-bar__actions { display: flex; gap: 6px; }
 .reader-bar__progress { font: 500 11px 'DM Mono', monospace; color: var(--muted); }
+.reader-bar__stats-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  font: 500 11px 'DM Mono', monospace;
+  color: var(--muted-strong);
+}
+.reader-bar__dot { opacity: 0.4; }
+.reader-bar__pct { color: var(--accent); font-weight: 600; }
+.reader-bar__rem { color: var(--muted); }
+.reader-toc__search {
+  margin-bottom: 12px;
+}
+.reader-toc__input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+.reader-toc__input:focus {
+  border-color: var(--accent);
+}
+.reader-toc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .reader-btn {
   display: grid; place-items: center;
   width: 36px; height: 36px;
@@ -2782,6 +2819,82 @@ body, .sidebar, .topbar, .shell__main, .bottom-nav, .modal, .dropdown {
   background: var(--accent-soft);
 }
 
+/* Enhanced Search Feedback Box */
+.search-feedback-action-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-top: 24px;
+}
+.search-feedback-action-box__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.search-feedback-action-box__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px 'DM Mono', monospace;
+  color: var(--ink);
+  letter-spacing: 0.5px;
+}
+.search-feedback-action-box__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-feedback-vote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.search-feedback-vote-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.search-feedback-vote-btn--voted {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.search-feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.search-feedback-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+.search-feedback-input:focus {
+  border-color: var(--accent);
+}
+
+
 .search-empty-suggestions {
   display: flex;
   flex-direction: column;
@@ -2926,5 +3039,33 @@ body, .sidebar, .topbar, .shell__main, .bottom-nav, .modal, .dropdown {
 .topbar__search-clear:hover {
   color: var(--ink);
 }
+
+/* Google Auth Button */
+.google-auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  margin-bottom: 12px;
+}
+.google-auth-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+.google-auth-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 
 

@@ -1,0 +1,195 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and reader preferences",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user identifier matching Firebase Auth UID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Reader/Author display name",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "description": "Verified email address"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile picture URL"
+        },
+        "role": {
+          "type": "string",
+          "description": "User role in the app",
+          "enum": ["Reader", "Author", "Admin"]
+        },
+        "uiPreferences": {
+          "type": "object",
+          "description": "Reader theme, font size, and typography choices"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "displayName", "email"]
+    },
+    "Novel": {
+      "title": "Novel",
+      "description": "Webnovel publication record",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique novel ID"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Owner/Author UID"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Author pen name",
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "description": "Novel title",
+          "maxLength": 200
+        },
+        "synopsis": {
+          "type": "string",
+          "description": "Novel summary or description",
+          "maxLength": 5000
+        },
+        "genre": {
+          "type": "string",
+          "description": "Primary genre"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Draft", "Ongoing", "Completed"]
+        },
+        "coverColor": {
+          "type": "string"
+        },
+        "coverGradient": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array"
+        },
+        "reads": {
+          "type": "integer"
+        },
+        "rating": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "authorId", "title", "genre", "status"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "Individual novel chapter",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique chapter ID"
+        },
+        "novelId": {
+          "type": "string",
+          "description": "Associated novel ID"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Author UID"
+        },
+        "chapterNumber": {
+          "type": "integer",
+          "description": "Sequential chapter index (1-based)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Chapter title",
+          "maxLength": 200
+        },
+        "contentText": {
+          "type": "string",
+          "description": "Full chapter body text (5,000+ words)"
+        },
+        "wordCount": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Draft", "Notes", "Outline", "Published"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "novelId", "authorId", "chapterNumber", "title"]
+    },
+    "LibraryItem": {
+      "title": "LibraryItem",
+      "description": "User bookshelf item tracking reading progress",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "novelId": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "integer"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "lastReadAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "novelId", "progress"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and settings"
+    },
+    "/novels/{novelId}": {
+      "schema": "Novel",
+      "description": "Published and creator novels"
+    },
+    "/novels/{novelId}/chapters/{chapterId}": {
+      "schema": "Chapter",
+      "description": "Chapters belonging to a novel"
+    },
+    "/users/{userId}/library/{novelId}": {
+      "schema": "LibraryItem",
+      "description": "User saved library items"
+    }
+  }
+}

@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection verification endpoint required by Firebase Skill
+    match /test/{docId} {
+      allow get: if true;
+    }
+
+    // Hardened Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'displayName', 'email'])
+        && data.id is string
+        && data.id == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() > 0
+        && data.displayName.size() <= 100
+        && data.email is string
+        && data.email.size() <= 200;
+    }
+
+    function isValidNovel(data) {
+      return data.keys().hasAll(['id', 'authorId', 'title', 'genre', 'status'])
+        && data.id is string
+        && data.authorId is string
+        && data.authorId == request.auth.uid
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && data.genre is string
+        && data.genre.size() <= 50
+        && data.status in ['Draft', 'Ongoing', 'Completed'];
+    }
+
+    function isValidChapter(data) {
+      return data.keys().hasAll(['id', 'novelId', 'authorId', 'chapterNumber', 'title'])
+        && data.id is string
+        && data.novelId is string
+        && data.authorId is string
+        && data.authorId == request.auth.uid
+        && data.chapterNumber is int
+        && data.chapterNumber >= 1
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || resource.data.role != 'Private');
+      allow list: if isSignedIn() && resource.data.id == request.auth.uid;
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && incoming().id == existing().id;
+      allow delete: if isOwner(userId);
+
+      // Subcollection: User Bookshelf / Library
+      match /library/{novelId} {
+        allow read, write: if isOwner(userId) && isValidId(novelId);
+      }
+    }
+
+    // Novels Collection
+    match /novels/{novelId} {
+      allow get: if resource.data.status != 'Draft' || (isSignedIn() && resource.data.authorId == request.auth.uid);
+      allow list: if resource.data.status != 'Draft' || (isSignedIn() && resource.data.authorId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(novelId) && incoming().authorId == request.auth.uid && isValidNovel(incoming());
+      allow update: if isSignedIn() && isValidId(novelId) && existing().authorId == request.auth.uid && incoming().authorId == existing().authorId && isValidNovel(incoming());
+      allow delete: if isSignedIn() && isValidId(novelId) && existing().authorId == request.auth.uid;
+
+      // Subcollection: Chapters
+      match /chapters/{chapterId} {
+        allow get: if get(/databases/$(database)/documents/novels/$(novelId)).data.status != 'Draft'
+          || (isSignedIn() && get(/databases/$(database)/documents/novels/$(novelId)).data.authorId == request.auth.uid);
+        allow list: if get(/databases/$(database)/documents/novels/$(novelId)).data.status != 'Draft'
+          || (isSignedIn() && get(/databases/$(database)/documents/novels/$(novelId)).data.authorId == request.auth.uid);
+        allow create: if isSignedIn()
+          && isValidId(chapterId)
+          && incoming().authorId == request.auth.uid
+          && get(/databases/$(database)/documents/novels/$(novelId)).data.authorId == request.auth.uid
+          && isValidChapter(incoming());
+        allow update: if isSignedIn()
+          && isValidId(chapterId)
+          && existing().authorId == request.auth.uid
+          && incoming().authorId == existing().authorId
+          && isValidChapter(incoming());
+        allow delete: if isSignedIn()
+          && isValidId(chapterId)
+          && existing().authorId == request.auth.uid;
+      }
+    }
+  }
+}

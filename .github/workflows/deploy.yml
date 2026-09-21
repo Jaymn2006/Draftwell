@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -22,10 +22,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -34,19 +34,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build production bundle
         run: npm run build
         env:
-          # Secrets are set in GitHub → Settings → Secrets and variables → Actions
+          VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/Draftwell/' }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
+          VITE_ALLOW_MEDIA_CDN: ${{ secrets.VITE_ALLOW_MEDIA_CDN || 'false' }}
+          VITE_ALLOW_TELEMETRY: ${{ secrets.VITE_ALLOW_TELEMETRY || 'false' }}
 
-      - name: Upload Pages artifact
+      - name: Deploy to gh-pages branch (Legacy / Branch deployment fallback)
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          clean: true
+        continue-on-error: true
+
+      - name: Upload Pages artifact (Actions deployment)
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (Actions deployment)
         id: deployment
         uses: actions/deploy-pages@v4

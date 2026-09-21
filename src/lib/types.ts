@@ -34,6 +34,7 @@ export interface Story {
   status: StoryStatus
   coverColor: string
   coverGradient?: string
+  coverImage?: string
   chapters: Chapter[]
   totalWords: number
   createdAt: number

@@ -9,10 +9,11 @@ import {
   AlignJustify, Type, Moon, Sun, Leaf, Zap, BookCopy, Clock,
   BarChart2, MessageCircle, Bell as BellIcon, Eye, ChevronDown,
   CheckCircle, LogOut, HelpCircle, PanelLeft, GraduationCap, Download,
-  Palette, Menu
+  Palette, Menu, ThumbsUp, ThumbsDown, MessageSquare
 } from 'lucide-react'
 import { useApp } from './lib/context'
 import { useToast } from './lib/toast'
+import { submitFeedback } from './lib/cloud'
 import { DEMO_AUTHORS, DEMO_STORIES, GENRES } from './lib/demo'
 import { MASTERCLASSES } from './lib/masterclasses'
 import { MobileDrawer } from './components/MobileDrawer'
@@ -20,7 +21,9 @@ import { BookPreviewView } from './components/BookPreview'
 import { MasterclassesView } from './components/MasterclassesView'
 import { MiraCraftCoach } from './components/MiraCraftCoach'
 import { LazyCover } from './components/LazyImage'
+import { fetchSampleCoversFromBoard, pinterestCoverService } from './lib/pinterestCoverService'
 import { supabase } from './lib/supabase'
+import { logOutFirebase } from './lib/firebase'
 import type { Chapter, Comment, ReaderTheme, Story, StoryStatus, Theme } from './lib/types'
 
 // ── Brand mark ────────────────────────────────────────────────────────────
@@ -50,7 +53,9 @@ function timeAgo(ms: number) {
 // ── Cover component ───────────────────────────────────────────────────────
 function StoryCover({ story, onClick, size = 'md' }: { story: Story; onClick?: () => void; size?: 'sm' | 'md' | 'lg' }) {
   const cls = `story-cover story-cover--${size}${onClick ? ' story-cover--btn' : ''}`
-  const style = { background: story.coverGradient ?? story.coverColor }
+  const style = story.coverImage
+    ? { backgroundImage: `url("${story.coverImage}")`, backgroundColor: story.coverColor || '#1a1612' }
+    : { background: story.coverGradient ?? story.coverColor }
   const content = (
     <div className="story-cover__inner">
       <span className="story-cover__title">{story.title}</span>
@@ -223,6 +228,7 @@ export function ProductShell() {
                 <button role="menuitem" className="dropdown__item--danger" onClick={() => {
                   setProfileMenuOpen(false)
                   if (supabase) void supabase.auth.signOut()
+                  void logOutFirebase()
                   localStorage.removeItem('draftwell-offline-mode')
                   app.setAuthenticated(false); app.setUserId(null)
                 }}><LogOut size={15} /> Sign out</button>
@@ -535,6 +541,41 @@ function DiscoverPage() {
   const [status, setStatus] = useState('All')
   const [sort, setSort] = useState<'trending' | 'newest' | 'rating' | 'reads'>('trending')
   const [query, setQuery] = useState('')
+  const [pinterestCovers, setPinterestCovers] = useState<string[]>([])
+  const [coversLoading, setCoversLoading] = useState(false)
+  const [coverSource, setCoverSource] = useState<'pinterest' | 'cdn-proxy' | 'fallback'>('fallback')
+
+  const loadDiscoveryCovers = useCallback(async (force = false) => {
+    setCoversLoading(true)
+    try {
+      const covers = await fetchSampleCoversFromBoard('sample-webnovel-covers', {
+        width: 400,
+        height: 600,
+        limit: 12,
+        forceRefresh: force,
+      })
+      setPinterestCovers(covers)
+      if (pinterestCoverService.isOffline()) {
+        setCoverSource('fallback')
+      } else if (pinterestCoverService.isMediaCdnEnabled()) {
+        setCoverSource('cdn-proxy')
+      } else if (pinterestCoverService.getAccessToken()) {
+        setCoverSource('pinterest')
+      } else {
+        setCoverSource('fallback')
+      }
+    } catch (err) {
+      console.warn('Novel discovery shelf cover boundary caught:', err)
+      setPinterestCovers(pinterestCoverService.getLocalPlaceholders(6))
+      setCoverSource('fallback')
+    } finally {
+      setCoversLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDiscoveryCovers()
+  }, [loadDiscoveryCovers])
 
   const filtered = useMemo(() => {
     let list = allStories.filter((s) => !s.isOwn)
@@ -548,6 +589,19 @@ function DiscoverPage() {
     return list
   }, [allStories, genre, status, sort, query])
 
+  const storiesWithCovers = useMemo(() => {
+    return filtered.map((s, idx) => {
+      if (s.coverImage) return s
+      if (pinterestCovers.length > 0) {
+        return {
+          ...s,
+          coverImage: pinterestCovers[idx % pinterestCovers.length],
+        }
+      }
+      return s
+    })
+  }, [filtered, pinterestCovers])
+
   function handleLibraryToggle(s: Story) {
     if (isInLibrary(s.id)) { removeFromLibrary(s.id); success('Removed from library') }
     else { addToLibrary(s.id); success('Added to your library') }
@@ -558,6 +612,46 @@ function DiscoverPage() {
       <div className="page-head">
         <h1>Discover</h1>
       </div>
+
+      {/* Pinterest Inspiration Shelf Status & Sync Controller */}
+      <div className="discovery-shelf-banner" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+        padding: '10px 14px',
+        marginBottom: '14px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        background: 'var(--card-bg, rgba(255,255,255,0.03))',
+        fontSize: '12px',
+        color: 'var(--muted)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sparkles size={14} style={{ color: 'var(--accent)' }} />
+          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Novel Discovery Shelf:</span>
+          <span>
+            {coverSource === 'cdn-proxy'
+              ? '⚡ Cloudinary WebP Edge Proxy'
+              : coverSource === 'pinterest'
+              ? '🎨 Pinterest API v5 Pins'
+              : '🛡️ Local Geometric Zero-Reflow Placeholders'}
+          </span>
+        </div>
+        <button
+          className="btn btn--xs btn--ghost"
+          onClick={() => {
+            loadDiscoveryCovers(true)
+            success('Refreshing Pinterest inspiration covers…')
+          }}
+          disabled={coversLoading}
+          title="Refresh board cover pins"
+        >
+          {coversLoading ? 'Syncing…' : 'Sync Board Covers'}
+        </button>
+      </div>
+
       <div className="discover-filters">
         <div className="filter-group">
           <label htmlFor="filter-search" className="sr-only">Search</label>
@@ -597,7 +691,7 @@ function DiscoverPage() {
       <p className="result-count">{filtered.length} {filtered.length === 1 ? 'story' : 'stories'}{query ? ` matching "${query}"` : ''}</p>
       {filtered.length === 0
         ? <EmptyState icon={Search} title="No stories found" text="Try adjusting your filters or search terms." action="Clear all" onAction={() => { setGenre('All'); setStatus('All'); setQuery('') }} />
-        : <div className="work-grid work-grid--discover">{filtered.map((s) => <WorkCard key={s.id} story={s} onLibraryToggle={handleLibraryToggle} />)}</div>
+        : <div className="work-grid work-grid--discover">{storiesWithCovers.map((s) => <WorkCard key={s.id} story={s} onLibraryToggle={handleLibraryToggle} />)}</div>
       }
     </div>
   )
@@ -658,8 +752,38 @@ function SearchPage() {
     return m ? decodeURIComponent(m[1]) : ''
   })
   const [selectedGenre, setSelectedGenre] = useState<string>('All')
+  const [searchRating, setSearchRating] = useState<'helpful' | 'unhelpful' | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
+
+  async function handleSendFeedback(e?: React.FormEvent) {
+    if (e) e.preventDefault()
+    if (!feedbackText.trim() && !searchRating) return
+    setIsSubmittingFeedback(true)
+    try {
+      await submitFeedback({
+        rating: searchRating === 'helpful' ? 5 : 2,
+        message: `Search query: "${query}" | Genre: "${selectedGenre}" | Note: ${feedbackText}`,
+        kind: 'first-minute',
+      }).catch(() => {
+        try {
+          const list = JSON.parse(localStorage.getItem('draftwell-search-feedback') || '[]')
+          list.push({ query, selectedGenre, rating: searchRating, text: feedbackText, date: Date.now() })
+          localStorage.setItem('draftwell-search-feedback', JSON.stringify(list))
+        } catch {
+          // ignore quota
+        }
+      })
+      setFeedbackSubmitted(true)
+      success('Thank you! Your search feedback helps us curate more webnovels.')
+    } finally {
+      setIsSubmittingFeedback(false)
+    }
+  }
 
   const { results, matchCounts } = useMemo(() => {
     if (!query.trim() && selectedGenre === 'All') {
@@ -843,6 +967,86 @@ function SearchPage() {
           ))}
         </div>
       )}
+
+      {/* Search Feedback Action Component */}
+      <div className="search-feedback-action-box">
+        <div className="search-feedback-action-box__header">
+          <div className="search-feedback-action-box__title">
+            <MessageSquare size={15} style={{ color: 'var(--accent)' }} />
+            <span>Search Feedback</span>
+            <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 400 }}>
+              · Help improve Draftwell discovery
+            </span>
+          </div>
+
+          <div className="search-feedback-action-box__actions">
+            <button
+              className={`search-feedback-vote-btn${searchRating === 'helpful' ? ' search-feedback-vote-btn--voted' : ''}`}
+              onClick={() => {
+                setSearchRating('helpful')
+                success('Marked search results as helpful')
+              }}
+              title="Helpful results"
+            >
+              <ThumbsUp size={13} />
+              <span>Relevant</span>
+            </button>
+            <button
+              className={`search-feedback-vote-btn${searchRating === 'unhelpful' ? ' search-feedback-vote-btn--voted' : ''}`}
+              onClick={() => {
+                setSearchRating('unhelpful')
+                setFeedbackOpen(true)
+              }}
+              title="Not what you were looking for"
+            >
+              <ThumbsDown size={13} />
+              <span>Could be better</span>
+            </button>
+            <button
+              className="btn btn--xs btn--ghost"
+              onClick={() => setFeedbackOpen((v) => !v)}
+            >
+              {feedbackOpen ? 'Hide' : "Can't find a webnovel?"}
+            </button>
+          </div>
+        </div>
+
+        {feedbackOpen && (
+          <form className="search-feedback-form" onSubmit={handleSendFeedback}>
+            {feedbackSubmitted ? (
+              <p style={{ margin: '4px 0', fontSize: '13px', color: 'var(--accent)' }}>
+                ✓ Feedback recorded. Our content and search team reviews novel requests and missing keywords regularly!
+              </p>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Which book, author, or genre were you hoping to find?"
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  className="search-feedback-input"
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn--xs btn--ghost"
+                    onClick={() => setFeedbackOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn--xs btn--primary"
+                    disabled={isSubmittingFeedback || (!feedbackText.trim() && !searchRating)}
+                  >
+                    {isSubmittingFeedback ? 'Sending…' : 'Submit Search Feedback'}
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
+        )}
+      </div>
     </div>
   )
 }
@@ -986,6 +1190,8 @@ function ReaderPage() {
   const story = getStory(storyId)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tocOpen, setTocOpen] = useState(false)
+  const [tocFilter, setTocFilter] = useState('')
+  const [scrollProgress, setScrollProgress] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
   const readerRef = useRef<HTMLDivElement>(null)
   const [showControls, setShowControls] = useState(true)
@@ -995,7 +1201,7 @@ function ReaderPage() {
   function resetHideTimer() {
     setShowControls(true)
     if (hideTimer.current) clearTimeout(hideTimer.current)
-    hideTimer.current = window.setTimeout(() => setShowControls(false), 3000)
+    hideTimer.current = window.setTimeout(() => setShowControls(false), 3500)
   }
   useEffect(() => { resetHideTimer(); return () => { if (hideTimer.current) clearTimeout(hideTimer.current) } }, [])
 
@@ -1016,6 +1222,36 @@ function ReaderPage() {
   if (!story) return <NotFoundPage />
   const chapter = story.chapters[chapterIdx]
   if (!chapter) return <NotFoundPage />
+
+  // ── Long-Form Scroll Tracking & Offline Position Persistence ─────────
+  useEffect(() => {
+    const handleScroll = () => {
+      const el = document.documentElement
+      const total = el.scrollHeight - el.clientHeight
+      if (total > 0) {
+        const pct = Math.min(100, Math.max(0, (window.scrollY / total) * 100))
+        setScrollProgress(pct)
+        try {
+          localStorage.setItem(`draftwell-read-pos-${storyId}-${chapter.id}`, String(window.scrollY))
+        } catch {
+          // ignore quota
+        }
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [storyId, chapter.id])
+
+  // Restore previous position if returning to this chapter
+  useEffect(() => {
+    const saved = localStorage.getItem(`draftwell-read-pos-${storyId}-${chapter.id}`)
+    if (saved) {
+      const pos = parseFloat(saved)
+      if (pos > 100) {
+        window.scrollTo({ top: pos, behavior: 'instant' })
+      }
+    }
+  }, [storyId, chapter.id])
 
   function goNext() {
     const next = chapterIdx + 1
@@ -1062,7 +1298,7 @@ function ReaderPage() {
         </button>
         <div className="reader-bar__title">
           <span className="reader-bar__story">{story.title}</span>
-          <span className="reader-bar__chapter">Ch. {chapterIdx + 1} of {story.chapters.length}</span>
+          <span className="reader-bar__chapter">Ch. {chapterIdx + 1} of {story.chapters.length} · {wordCount.toLocaleString()} words</span>
         </div>
         <div className="reader-bar__actions">
           <button className="reader-btn" aria-label="Table of contents (T)" title="Contents (T)" onClick={() => setTocOpen((v) => !v)}><AlignJustify size={17} /></button>
@@ -1072,22 +1308,39 @@ function ReaderPage() {
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Real-time In-Chapter Progress Bar */}
       <div className="reader-progress">
-        <div className="reader-progress__bar" style={{ width: `${((chapterIdx + 1) / story.chapters.length) * 100}%` }} />
+        <div className="reader-progress__bar" style={{ width: `${scrollProgress}%` }} />
       </div>
 
-      {/* TOC panel */}
+      {/* TOC panel with Search */}
       {tocOpen && (
         <div className="reader-toc">
-          <div className="reader-toc__head"><h2>Chapters</h2><button className="icon-btn" onClick={() => setTocOpen(false)}><X size={16} /></button></div>
-          {story.chapters.map((ch, i) => (
-            <button key={ch.id} className={`reader-toc__item${i === chapterIdx ? ' reader-toc__item--active' : ''}`}
-              onClick={() => { setChapterIdx(i); updateProgress(storyId, i); setTocOpen(false); window.scrollTo(0, 0) }}>
-              <span className="reader-toc__num">{i + 1}</span>
-              <span>{ch.title}</span>
-            </button>
-          ))}
+          <div className="reader-toc__head">
+            <h2>Chapters ({story.chapters.length})</h2>
+            <button className="icon-btn" onClick={() => setTocOpen(false)}><X size={16} /></button>
+          </div>
+          <div className="reader-toc__search">
+            <input
+              type="text"
+              placeholder="Filter chapters..."
+              value={tocFilter}
+              onChange={(e) => setTocFilter(e.target.value)}
+              className="reader-toc__input"
+            />
+          </div>
+          <div className="reader-toc__list">
+            {story.chapters
+              .map((ch, i) => ({ ch, i }))
+              .filter(({ ch, i }) => !tocFilter.trim() || ch.title.toLowerCase().includes(tocFilter.toLowerCase()) || String(i + 1).includes(tocFilter))
+              .map(({ ch, i }) => (
+                <button key={ch.id} className={`reader-toc__item${i === chapterIdx ? ' reader-toc__item--active' : ''}`}
+                  onClick={() => { setChapterIdx(i); updateProgress(storyId, i); setTocOpen(false); window.scrollTo(0, 0) }}>
+                  <span className="reader-toc__num">{i + 1}</span>
+                  <span>{ch.title}</span>
+                </button>
+              ))}
+          </div>
         </div>
       )}
 
@@ -1141,7 +1394,11 @@ function ReaderPage() {
       )}
 
       {/* Chapter content */}
-      <article className="reader-content" style={{ fontSize: settings.readerFontSize, lineHeight: settings.readerLineHeight, fontFamily: settings.font === 'serif' ? "'Fraunces', Georgia, serif" : "'DM Sans', sans-serif" }}>
+      <article
+        className="reader-content"
+        onDoubleClick={() => setShowControls((v) => !v)}
+        style={{ fontSize: settings.readerFontSize, lineHeight: settings.readerLineHeight, fontFamily: settings.font === 'serif' ? "'Fraunces', Georgia, serif" : "'DM Sans', sans-serif" }}
+      >
         <div className="reader-chapter-meta">
           <span className="reader-chapter-num">CHAPTER {String(chapterIdx + 1).padStart(2, '0')}</span>
           <h1 className="reader-chapter-title">{chapter.title}</h1>
@@ -1149,6 +1406,8 @@ function ReaderPage() {
             <span>{wordCount.toLocaleString()} words</span>
             <span>·</span>
             <span>{readTime(wordCount)} min read</span>
+            <span>·</span>
+            <span>Double-click text for distraction-free view</span>
           </div>
         </div>
         <div className="reader-body">
@@ -1179,10 +1438,16 @@ function ReaderPage() {
         </div>
       )}
 
-      {/* Bottom nav bar */}
+      {/* Bottom nav bar with in-chapter telemetry & reading stats */}
       <div className={`reader-bar reader-bar--bottom${showControls ? '' : ' reader-bar--hidden'}`}>
         <button className="reader-btn" disabled={chapterIdx === 0} aria-label="Previous chapter" onClick={goPrev}><ArrowLeft size={18} /></button>
-        <span className="reader-bar__progress">{chapterIdx + 1} / {story.chapters.length}</span>
+        <div className="reader-bar__stats-pill">
+          <span className="reader-bar__progress">Ch. {chapterIdx + 1}/{story.chapters.length}</span>
+          <span className="reader-bar__dot">·</span>
+          <span className="reader-bar__pct">{Math.round(scrollProgress)}% read</span>
+          <span className="reader-bar__dot">·</span>
+          <span className="reader-bar__rem">{Math.max(1, Math.ceil((wordCount * (1 - scrollProgress / 100)) / 200))} min left</span>
+        </div>
         <button className="reader-btn" disabled={isLast} aria-label="Next chapter" onClick={goNext}><ArrowRight size={18} /></button>
       </div>
     </div>
