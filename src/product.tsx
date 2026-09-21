@@ -8,13 +8,20 @@ import {
   Upload, UserCircle, Users, WandSparkles, X, Maximize2, Minimize2,
   AlignJustify, Type, Moon, Sun, Leaf, Zap, BookCopy, Clock,
   BarChart2, MessageCircle, Bell as BellIcon, Eye, ChevronDown,
-  CheckCircle, LogOut, HelpCircle, PanelLeft,
+  CheckCircle, LogOut, HelpCircle, PanelLeft, GraduationCap, Download,
+  Palette, Menu
 } from 'lucide-react'
 import { useApp } from './lib/context'
 import { useToast } from './lib/toast'
 import { DEMO_AUTHORS, DEMO_STORIES, GENRES } from './lib/demo'
+import { MASTERCLASSES } from './lib/masterclasses'
+import { MobileDrawer } from './components/MobileDrawer'
+import { BookPreviewView } from './components/BookPreview'
+import { MasterclassesView } from './components/MasterclassesView'
+import { MiraCraftCoach } from './components/MiraCraftCoach'
+import { LazyCover } from './components/LazyImage'
 import { supabase } from './lib/supabase'
-import type { Chapter, Comment, ReaderTheme, Story, StoryStatus } from './lib/types'
+import type { Chapter, Comment, ReaderTheme, Story, StoryStatus, Theme } from './lib/types'
 
 // ── Brand mark ────────────────────────────────────────────────────────────
 function BrandMark({ size = 28 }: { size?: number }) {
@@ -50,9 +57,14 @@ function StoryCover({ story, onClick, size = 'md' }: { story: Story; onClick?: (
       <span className="story-cover__author">{story.author}</span>
     </div>
   )
-  return onClick
-    ? <button className={cls} style={style} onClick={onClick} aria-label={`Open ${story.title}`}>{content}</button>
-    : <div className={cls} style={style}>{content}</div>
+  return (
+    <LazyCover className={`lazy-cover--${size}`} minHeight={size === 'sm' ? 84 : size === 'lg' ? 220 : 140}>
+      {onClick
+        ? <button className={cls} style={style} onClick={onClick} aria-label={`Open ${story.title}`}>{content}</button>
+        : <div className={cls} style={style}>{content}</div>
+      }
+    </LazyCover>
+  )
 }
 
 // ── Rating stars ──────────────────────────────────────────────────────────
@@ -153,16 +165,22 @@ export function ProductShell() {
   const isReader = route.startsWith('/read/')
   if (isReader) return <ReaderPage />
 
+  function cycleTheme() {
+    const sequence: Theme[] = ['dark', 'light', 'amber', 'eye']
+    const nextIdx = (sequence.indexOf(settings.theme) + 1) % sequence.length
+    app.updateSettings({ theme: sequence[nextIdx] })
+  }
+
   return (
     <div className="shell" style={{ '--accent': settings.accent } as React.CSSProperties}
       data-sidebar={sidebarOpen ? 'open' : 'closed'}>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && <div className="shell__overlay" onClick={() => setSidebarOpen(false)} />}
+      {/* Slideout Mobile Drawer */}
+      <MobileDrawer isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* TOP BAR */}
       <header className="topbar">
-        <button className="topbar__menu-btn icon-btn" aria-label="Toggle menu" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <button className="topbar__menu-btn icon-btn" aria-label="Toggle menu" onClick={() => setSidebarOpen(true)}>
           <PanelLeft size={20} />
         </button>
         <button className="topbar__brand" onClick={() => navigate('/home')} aria-label="Draftwell home">
@@ -172,9 +190,16 @@ export function ProductShell() {
         <form className="topbar__search" onSubmit={handleSearch} role="search">
           <Search size={15} />
           <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search stories, authors…" aria-label="Search" />
+            placeholder="Search titles, authors, worlds…" aria-label="Search" />
         </form>
         <div className="topbar__actions">
+          {/* Quick theme switcher */}
+          <button className="topbar__theme-toggle" aria-label={`Theme: ${settings.theme}. Click to change`} onClick={cycleTheme} title={`Theme: ${settings.theme}`}>
+            {settings.theme === 'dark' && <Moon size={17} />}
+            {settings.theme === 'light' && <Sun size={17} />}
+            {settings.theme === 'amber' && <Palette size={17} />}
+            {settings.theme === 'eye' && <Leaf size={17} />}
+          </button>
           <button className="icon-btn topbar__notif" aria-label="Notifications" onClick={() => navigate('/notifications')}>
             <Bell size={18} />
             {unreadCount > 0 && <span className="badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
@@ -190,6 +215,8 @@ export function ProductShell() {
                 <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/profile') }}><UserCircle size={15} /> Profile</button>
                 <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/library') }}><Library size={15} /> My Library</button>
                 <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio') }}><PenLine size={15} /> Creator Studio</button>
+                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio/preview') }}><BookOpen size={15} /> Live Book Preview</button>
+                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio/masterclasses') }}><GraduationCap size={15} /> Masterclasses</button>
                 <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/settings') }}><Settings size={15} /> Settings</button>
                 <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/help') }}><HelpCircle size={15} /> Help</button>
                 <div className="dropdown__divider" />
@@ -232,10 +259,22 @@ export function ProductShell() {
               {count > 0 && <span className="sidebar__count">{count}</span>}
             </button>
           ))}
-          <div className="sidebar__section-label sidebar__section-label--mt">CREATE</div>
-          <button className={`sidebar__link${route.startsWith('/studio') ? ' sidebar__link--active' : ''}`}
+          <div className="sidebar__section-label sidebar__section-label--mt">CREATOR STUDIO</div>
+          <button className={`sidebar__link${route === '/studio' ? ' sidebar__link--active' : ''}`}
             onClick={() => navigate('/studio')}>
-            <PenLine size={16} />Creator Studio
+            <BarChart2 size={16} />Dashboard
+          </button>
+          <button className={`sidebar__link${route.startsWith('/studio/write') || route.startsWith('/studio/edit') ? ' sidebar__link--active' : ''}`}
+            onClick={() => navigate('/studio/write/new')}>
+            <PenLine size={16} />Write Novel
+          </button>
+          <button className={`sidebar__link${route.startsWith('/studio/preview') ? ' sidebar__link--active' : ''}`}
+            onClick={() => navigate('/studio/preview')}>
+            <BookOpen size={16} />Book Preview
+          </button>
+          <button className={`sidebar__link${route.startsWith('/studio/masterclasses') ? ' sidebar__link--active' : ''}`}
+            onClick={() => navigate('/studio/masterclasses')}>
+            <GraduationCap size={16} />Masterclasses
           </button>
           <div className="sidebar__divider" />
           <button className={`sidebar__link${route === '/settings' ? ' sidebar__link--active' : ''}`}
@@ -270,19 +309,36 @@ export function ProductShell() {
 
       {/* MOBILE BOTTOM NAV */}
       <nav className="bottom-nav" aria-label="Mobile navigation">
-        {([
-          ['/home', Home, 'Home'],
-          ['/discover', Compass, 'Discover'],
-          ['/library', Library, 'Library'],
-          ['/studio', PenLine, 'Create'],
-          ['/profile', UserCircle, 'Profile'],
-        ] as const).map(([path, Icon, label]) => (
-          <button key={path} className={`bottom-nav__item${route === path || route.startsWith(path + '/') ? ' bottom-nav__item--active' : ''}`}
-            onClick={() => navigate(path)}>
-            <Icon size={20} />
-            <span>{label}</span>
-          </button>
-        ))}
+        <button className={`bottom-nav__item${route === '/home' ? ' bottom-nav__item--active' : ''}`}
+          onClick={() => navigate('/home')}>
+          <Home size={20} />
+          <span>Home</span>
+        </button>
+        <button className={`bottom-nav__item${route === '/discover' || route.startsWith('/discover') ? ' bottom-nav__item--active' : ''}`}
+          onClick={() => navigate('/discover')}>
+          <Compass size={20} />
+          <span>Discover</span>
+        </button>
+        <button className={`bottom-nav__item${route === '/search' || route.startsWith('/search') ? ' bottom-nav__item--active' : ''}`}
+          onClick={() => navigate('/search')}>
+          <Search size={20} />
+          <span>Search</span>
+        </button>
+        <button className={`bottom-nav__item${route.startsWith('/studio') ? ' bottom-nav__item--active' : ''}`}
+          onClick={() => navigate('/studio')}>
+          <PenLine size={20} />
+          <span>Studio</span>
+        </button>
+        <button className={`bottom-nav__item${route === '/library' ? ' bottom-nav__item--active' : ''}`}
+          onClick={() => navigate('/library')}>
+          <Library size={20} />
+          <span>Shelf</span>
+          {app.library.length > 0 && <span className="bottom-nav__badge">{app.library.length}</span>}
+        </button>
+        <button className="bottom-nav__item" onClick={() => setSidebarOpen(true)}>
+          <Menu size={20} />
+          <span>Menu</span>
+        </button>
       </nav>
     </div>
   )
@@ -296,11 +352,13 @@ function HomePage() {
   const { success } = useToast()
 
   const featured = allStories.find((s) => s.id === 'demo-1') ?? allStories[0]
-  const trending = [...allStories].sort((a, b) => (b.reads ?? 0) - (a.reads ?? 0)).slice(0, 6)
+  // Avoid repeating the featured story in trending and new releases
+  const otherStories = allStories.filter((s) => s.id !== featured?.id)
+  const trending = [...otherStories].sort((a, b) => (b.reads ?? 0) - (a.reads ?? 0)).slice(0, 4)
+  const newReleases = [...otherStories].filter((s) => !trending.some((t) => t.id === s.id)).slice(0, 4)
   const continueReading = library.filter((l) => l.progress > 0 && !l.completed)
     .map((l) => allStories.find((s) => s.id === l.storyId))
     .filter(Boolean) as Story[]
-  const newReleases = [...allStories].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6)
 
   function handleLibraryToggle(s: Story) {
     if (isInLibrary(s.id)) { removeFromLibrary(s.id); success(`Removed from library`) }
@@ -599,45 +657,191 @@ function SearchPage() {
     const m = route.match(/[?&]q=([^&]*)/)
     return m ? decodeURIComponent(m[1]) : ''
   })
+  const [selectedGenre, setSelectedGenre] = useState<string>('All')
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
 
-  const results = useMemo(() => {
-    if (!query.trim()) return []
-    const q = query.toLowerCase()
-    return allStories.filter((s) => `${s.title} ${s.author} ${s.description} ${s.tags.join(' ')} ${s.genre}`.toLowerCase().includes(q))
-  }, [query, allStories])
+  const { results, matchCounts } = useMemo(() => {
+    if (!query.trim() && selectedGenre === 'All') {
+      return { results: [], matchCounts: { title: 0, author: 0, genre: 0, tag: 0 } }
+    }
+
+    const q = query.trim().toLowerCase()
+    let titleMatches = 0
+    let authorMatches = 0
+    let genreMatches = 0
+    let tagMatches = 0
+
+    const list = allStories.filter((s) => {
+      // Genre filter check
+      if (selectedGenre !== 'All' && s.genre !== selectedGenre && !s.tags.includes(selectedGenre)) {
+        return false
+      }
+
+      if (!q) return true
+
+      const matchT = s.title.toLowerCase().includes(q)
+      const matchA = s.author.toLowerCase().includes(q)
+      const matchG = s.genre.toLowerCase().includes(q)
+      const matchTag = s.tags.some((t) => t.toLowerCase().includes(q))
+      const matchDesc = s.description.toLowerCase().includes(q)
+
+      if (matchT) titleMatches++
+      if (matchA) authorMatches++
+      if (matchG) genreMatches++
+      if (matchTag) tagMatches++
+
+      return matchT || matchA || matchG || matchTag || matchDesc
+    })
+
+    return {
+      results: list,
+      matchCounts: { title: titleMatches, author: authorMatches, genre: genreMatches, tag: tagMatches },
+    }
+  }, [query, selectedGenre, allStories])
 
   function handleLibraryToggle(s: Story) {
     if (isInLibrary(s.id)) { removeFromLibrary(s.id); success('Removed from library') }
     else { addToLibrary(s.id); success('Added to your library') }
   }
 
+  const suggestedTerms = ['The Shape of Rain', 'Mara Ellison', 'Fantasy', 'Mystery', 'Sci-Fi', 'Completed']
+
   return (
     <div className="page search-page">
       <div className="page-head"><h1>Search</h1></div>
+
       <div className="search-bar">
         <Search size={18} />
-        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search stories, authors, genres and tags…" aria-label="Search" />
-        {query && <button className="search-bar__clear" onClick={() => setQuery('')} aria-label="Clear"><X size={16} /></button>}
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search titles, authors, genres and tags…"
+          aria-label="Search"
+        />
+        {(query || selectedGenre !== 'All') && (
+          <button
+            className="search-bar__clear"
+            onClick={() => {
+              setQuery('')
+              setSelectedGenre('All')
+              inputRef.current?.focus()
+            }}
+            aria-label="Clear search"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
-      {!query && (
+
+      {/* Genre Filter Pills */}
+      <div className="search-filter-pills" style={{ margin: '14px 0 6px' }}>
+        <button
+          className={`search-filter-pill${selectedGenre === 'All' ? ' search-filter-pill--active' : ''}`}
+          onClick={() => setSelectedGenre('All')}
+        >
+          All Genres
+        </button>
+        {GENRES.filter((g) => g !== 'All').map((g) => (
+          <button
+            key={g}
+            className={`search-filter-pill${selectedGenre === g ? ' search-filter-pill--active' : ''}`}
+            onClick={() => setSelectedGenre(selectedGenre === g ? 'All' : g)}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+
+      {/* Search Feedback Summary Bar */}
+      {(query.trim() || selectedGenre !== 'All') && (
+        <div className="search-feedback-container">
+          <div className="search-feedback-bar">
+            <div className="search-feedback-summary">
+              <span>Results:</span>
+              <span className="search-feedback-badge">
+                {results.length} {results.length === 1 ? 'novel' : 'novels'}
+              </span>
+              {query && (
+                <span style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                  matching "{query}"
+                </span>
+              )}
+              {selectedGenre !== 'All' && (
+                <span className="tag tag--sm" style={{ marginLeft: 4 }}>
+                  in {selectedGenre}
+                </span>
+              )}
+            </div>
+
+            {results.length > 0 && query && (
+              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--muted)' }}>
+                {matchCounts.title > 0 && <span>{matchCounts.title} titles</span>}
+                {matchCounts.author > 0 && <span>• {matchCounts.author} authors</span>}
+                {matchCounts.tag > 0 && <span>• {matchCounts.tag} tags</span>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Empty Prompt when no query */}
+      {!query && selectedGenre === 'All' && (
         <div className="search-empty">
-          <p className="search-empty__hint">Try searching for a title, author, or genre</p>
+          <p className="search-empty__hint">Discover stories by title, author, or genre</p>
           <div className="genre-grid genre-grid--sm">
             {GENRES.filter((g) => g !== 'All').map((g) => (
-              <button key={g} className="genre-tile" onClick={() => setQuery(g)}>{g}</button>
+              <button key={g} className="genre-tile" onClick={() => setSelectedGenre(g)}>
+                {g}
+              </button>
             ))}
           </div>
         </div>
       )}
-      {query && results.length === 0 && <EmptyState icon={Search} title={`No results for "${query}"`} text="Try different keywords or browse by genre." action="Browse all" onAction={() => navigate('/discover')} />}
+
+      {/* No Results Feedback with Helpful Suggestions */}
+      {(query || selectedGenre !== 'All') && results.length === 0 && (
+        <div className="search-empty-suggestions">
+          <Search size={32} style={{ color: 'var(--accent)', opacity: 0.8 }} />
+          <h2 style={{ font: "500 20px 'Fraunces', serif", color: 'var(--ink)', margin: 0 }}>
+            No stories found {query ? `for "${query}"` : `in ${selectedGenre}`}
+          </h2>
+          <p>Try searching for keywords, exploring different genres, or using one of these popular queries:</p>
+          <div className="search-suggestions-list">
+            {suggestedTerms.map((term) => (
+              <button
+                key={term}
+                className="search-suggest-chip"
+                onClick={() => {
+                  setQuery(term)
+                  setSelectedGenre('All')
+                }}
+              >
+                {term}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn btn--ghost btn--sm"
+            style={{ marginTop: 8 }}
+            onClick={() => {
+              setQuery('')
+              setSelectedGenre('All')
+            }}
+          >
+            Clear search filters
+          </button>
+        </div>
+      )}
+
+      {/* Search Results Grid */}
       {results.length > 0 && (
-        <>
-          <p className="result-count">{results.length} result{results.length !== 1 ? 's' : ''} for "{query}"</p>
-          <div className="work-grid work-grid--discover">{results.map((s) => <WorkCard key={s.id} story={s} onLibraryToggle={handleLibraryToggle} />)}</div>
-        </>
+        <div className="work-grid work-grid--discover" style={{ marginTop: 12 }}>
+          {results.map((s) => (
+            <WorkCard key={s.id} story={s} onLibraryToggle={handleLibraryToggle} />
+          ))}
+        </div>
       )}
     </div>
   )
@@ -818,7 +1022,8 @@ function ReaderPage() {
     if (next < story!.chapters.length) {
       setChapterIdx(next)
       updateProgress(storyId, next)
-      window.history.replaceState({}, '', `/Draftwell/read/${storyId}/${next}`)
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+      window.history.replaceState({}, '', `${base}/read/${storyId}/${next}`)
       window.scrollTo(0, 0)
       addHistory({ storyId, chapterId: chapter.id, chapterNumber: next + 1, readAt: Date.now(), progress: next })
     }
@@ -828,7 +1033,8 @@ function ReaderPage() {
     if (prev >= 0) {
       setChapterIdx(prev)
       updateProgress(storyId, prev)
-      window.history.replaceState({}, '', `/Draftwell/read/${storyId}/${prev}`)
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+      window.history.replaceState({}, '', `${base}/read/${storyId}/${prev}`)
       window.scrollTo(0, 0)
     }
   }
@@ -987,7 +1193,7 @@ function ReaderPage() {
 // LIBRARY PAGE
 // ══════════════════════════════════════════════════════════════════════════
 function LibraryPage() {
-  const { library, allStories, navigate, removeFromLibrary } = useApp()
+  const { library, allStories, navigate, removeFromLibrary, addToLibrary } = useApp()
   const { success } = useToast()
   const [tab, setTab] = useState<'all' | 'reading' | 'completed'>('all')
   const items = useMemo(() => {
@@ -1005,9 +1211,33 @@ function LibraryPage() {
         <button className={`tab${tab === 'reading' ? ' tab--active' : ''}`} onClick={() => setTab('reading')}>Reading</button>
         <button className={`tab${tab === 'completed' ? ' tab--active' : ''}`} onClick={() => setTab('completed')}>Completed</button>
       </div>
-      {items.length === 0
-        ? <EmptyState icon={Library} title="Your reading room is waiting" text="Save a story from Discover and it will stay close on every visit." action="Explore Stories" onAction={() => navigate('/discover')} />
-        : (
+      {items.length === 0 ? (
+        <div className="empty-state-wrap">
+          <div className="empty-state-card">
+            <div className="empty-state-card__art"><Library size={32} /></div>
+            <h2>Your reading shelf is waiting</h2>
+            <p>Save novels, serials, and masterclass exercises to track your reading progress across all your devices.</p>
+            <button className="btn btn--primary" onClick={() => navigate('/discover')}>
+              <Compass size={15} /> Discover New Stories
+            </button>
+          </div>
+
+          <div className="suggested-shelf-section">
+            <div className="section-head">
+              <h2>Recommended for Your Shelf</h2>
+              <button className="section-head__link" onClick={() => navigate('/discover')}>Browse all <ChevronRight size={14} /></button>
+            </div>
+            <div className="work-grid work-grid--discover">
+              {allStories.filter((s) => !s.isOwn).slice(0, 3).map((s) => (
+                <WorkCard key={s.id} story={s} onLibraryToggle={(st) => {
+                  addToLibrary(st.id)
+                  success(`Added "${st.title}" to your shelf`)
+                }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
           <div className="library-grid">
             {items.map(({ item, story: s }) => (
               <article key={item.storyId} className="library-card">
@@ -1085,9 +1315,47 @@ function FollowingPage() {
   return (
     <div className="page following-page">
       <div className="page-head"><h1>Following</h1></div>
-      {follows.length === 0
-        ? <EmptyState icon={Users} title="Follow the voices you love" text="Follow an author to see their stories here." action="Discover Authors" onAction={() => navigate('/discover')} />
-        : (
+      {follows.length === 0 ? (
+        <div className="empty-state-wrap">
+          <div className="empty-state-card">
+            <div className="empty-state-card__art"><Users size={32} /></div>
+            <h2>Follow the voices you love</h2>
+            <p>Follow celebrated authors and community serialists to receive alerts whenever new chapters and novels drop.</p>
+            <button className="btn btn--primary" onClick={() => navigate('/discover')}>
+              <Compass size={15} /> Explore All Stories
+            </button>
+          </div>
+
+          <div className="suggested-shelf-section">
+            <div className="section-head">
+              <h2>Acclaimed Authors to Follow</h2>
+              <button className="section-head__link" onClick={() => navigate('/discover')}>View more <ChevronRight size={14} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+              {DEMO_AUTHORS.slice(0, 3).map((author) => (
+                <div key={author.id} className="following-card">
+                  <div className="following-card__head">
+                    <div className="avatar avatar--md">{author.name.slice(0, 2).toUpperCase()}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 className="following-card__name" onClick={() => navigate(`/author/${slug(author.name)}`)}>{author.name}</h3>
+                      <p className="following-card__genre">{author.genre} · {author.followers.toLocaleString()} readers</p>
+                    </div>
+                    <button className="btn btn--primary btn--sm" onClick={() => {
+                      toggleFollow(author.name)
+                      success(`Now following ${author.name}`)
+                    }}>
+                      + Follow
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--muted-strong)', lineHeight: 1.5, marginTop: 10 }}>
+                    {author.bio}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
           <div className="following-grid">
             {follows.map((f) => {
               const author = DEMO_AUTHORS.find((a) => a.name === f.authorName)
@@ -1474,17 +1742,29 @@ function StudioShell() {
   const isEditor = route.startsWith('/studio/write/') || route.startsWith('/studio/edit/')
   if (isEditor) return <StoryEditor />
 
+  if (route.startsWith('/studio/preview')) {
+    const storyId = route.replace('/studio/preview/', '').replace('/studio/preview', '')
+    return <BookPreviewView initialStoryId={storyId || undefined} />
+  }
+
+  if (route.startsWith('/studio/masterclasses')) {
+    const mcId = route.replace('/studio/masterclasses/', '').replace('/studio/masterclasses', '')
+    return <MasterclassesView activeId={mcId || undefined} />
+  }
+
   return (
     <div className="studio-shell">
       <aside className="studio-sidebar">
         <div className="studio-sidebar__label">CREATOR STUDIO</div>
         {([
           ['/studio', BarChart2, 'Dashboard'],
-          ['/studio/stories', BookCopy, 'My Stories'],
-          ['/studio/write/new', Plus, 'New Story'],
+          ['/studio/stories', BookCopy, 'My Novels'],
+          ['/studio/write/new', Plus, 'Write Novel'],
+          ['/studio/preview', BookOpen, 'Book Preview'],
+          ['/studio/masterclasses', GraduationCap, 'Masterclasses'],
           ['/studio/import', Upload, 'Import Novel'],
         ] as const).map(([path, Icon, label]) => (
-          <button key={path} className={`studio-sidebar__link${route === path ? ' studio-sidebar__link--active' : ''}`}
+          <button key={path} className={`studio-sidebar__link${route === path || (path !== '/studio' && route.startsWith(path)) ? ' studio-sidebar__link--active' : ''}`}
             onClick={() => navigate(path)}>
             <Icon size={16} />{label}
           </button>
@@ -1502,21 +1782,74 @@ function StudioShell() {
 
 // ── Studio Dashboard ──────────────────────────────────────────────────────
 function StudioDashboard() {
-  const { myStories, navigate, settings } = useApp()
+  const { myStories, allStories, navigate, settings } = useApp()
   const totalWords = myStories.reduce((acc, s) => acc + s.totalWords, 0)
   const totalChapters = myStories.reduce((acc, s) => acc + s.chapters.length, 0)
+  const publishedCount = myStories.filter((s) => s.status !== 'Draft').length
+
+  const mostRecentStory = myStories.length > 0
+    ? [...myStories].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    : allStories[0]
+
   return (
     <div className="studio-dashboard">
       <div className="studio-dashboard__greeting">
-        <span className="eyebrow">CREATOR STUDIO</span>
+        <span className="eyebrow">CREATOR STUDIO & NOVEL WORKBENCH</span>
         <h1>Welcome back, {settings.name.split(' ')[0]}.</h1>
+        <p style={{ color: 'var(--muted-strong)', fontSize: 14, marginTop: 4 }}>
+          Your central desk for drafting serials, previewing hardcover manuscripts, and mastering prose craft.
+        </p>
       </div>
+
+      {/* Quick Actions Bar */}
+      <div className="studio-quick-actions">
+        <button className="studio-quick-btn studio-quick-btn--primary" onClick={() => navigate('/studio/write/new')}>
+          <Plus size={16} /> Write New Novel
+        </button>
+        <button className="studio-quick-btn" onClick={() => navigate('/studio/preview')}>
+          <BookOpen size={16} /> Live Book Preview
+        </button>
+        <button className="studio-quick-btn" onClick={() => navigate('/studio/masterclasses')}>
+          <GraduationCap size={16} /> Masterclasses & Craft
+        </button>
+        <button className="studio-quick-btn" onClick={() => navigate('/studio/import')}>
+          <Upload size={16} /> Import Novel (.txt)
+        </button>
+      </div>
+
+      {/* Hero Spotlight: Continue Writing */}
+      {mostRecentStory && (
+        <div className="studio-spotlight">
+          <div className="studio-spotlight__content">
+            <span className="tag" style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 600 }}>
+              CONTINUE WRITING
+            </span>
+            <h2 className="studio-spotlight__title">{mostRecentStory.title}</h2>
+            <p className="studio-spotlight__meta">
+              {mostRecentStory.chapters.length} chapters drafted · {mostRecentStory.totalWords.toLocaleString()} words · Last updated {timeAgo(mostRecentStory.updatedAt)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              <button className="btn btn--primary btn--sm" onClick={() => navigate(`/studio/edit/${mostRecentStory.id}`)}>
+                <PenLine size={14} /> Open Manuscript Editor
+              </button>
+              <button className="btn btn--ghost btn--sm" onClick={() => navigate(`/studio/preview/${mostRecentStory.id}`)}>
+                <BookOpen size={14} /> Preview as Book
+              </button>
+            </div>
+          </div>
+          <div className="studio-spotlight__cover">
+            <StoryCover story={mostRecentStory} size="md" />
+          </div>
+        </div>
+      )}
+
+      {/* Stats bar */}
       <div className="studio-stats">
         {([
-          ['Stories', myStories.length, BookCopy],
-          ['Chapters', totalChapters, FileText],
-          ['Total Words', totalWords.toLocaleString(), PenLine],
-          ['Published', myStories.filter((s) => s.status !== 'Draft').length, Globe],
+          ['Novels', myStories.length, BookCopy],
+          ['Total Chapters', totalChapters, FileText],
+          ['Drafted Words', totalWords.toLocaleString(), PenLine],
+          ['Published', publishedCount, Globe],
         ] as [string, string | number, React.ElementType][]).map(([label, val, Icon]) => (
           <div key={label} className="studio-stat">
             <Icon size={20} />
@@ -1525,28 +1858,155 @@ function StudioDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Novels Desk */}
+      <div className="studio-section-head">
+        <h2>Your Manuscripts</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/studio/import')}>
+            <Upload size={13} /> Import
+          </button>
+          <button className="btn btn--primary btn--sm" onClick={() => navigate('/studio/write/new')}>
+            <Plus size={13} /> New Story
+          </button>
+        </div>
+      </div>
+
       {myStories.length === 0 ? (
         <div className="studio-empty">
           <PenLine size={40} />
           <h2>Your first story starts here.</h2>
-          <p>Create a story, write chapters, and share your world with readers.</p>
+          <p>Create a story, write chapters, and preview in print-grade book spreads.</p>
           <div className="studio-empty__actions">
             <button className="btn btn--primary" onClick={() => navigate('/studio/write/new')}>Create a Story</button>
             <button className="btn btn--ghost" onClick={() => navigate('/studio/import')}>Import a Novel</button>
           </div>
         </div>
       ) : (
-        <>
-          <div className="studio-section-head">
-            <h2>Your Stories</h2>
-            <button className="btn btn--ghost btn--sm" onClick={() => navigate('/studio/stories')}>View all</button>
-          </div>
-          <div className="studio-story-list">
-            {myStories.slice(0, 4).map((s) => <StoryRow key={s.id} story={s} />)}
-          </div>
-        </>
+        <div className="novels-grid">
+          {myStories.map((s) => <NovelCard key={s.id} story={s} />)}
+        </div>
       )}
+
+      {/* Craft Masterclasses Spotlight */}
+      <div className="studio-section-head" style={{ marginTop: 36 }}>
+        <div>
+          <h2>Writing Masterclasses</h2>
+          <p style={{ color: 'var(--muted-strong)', fontSize: 13, marginTop: 2 }}>
+            Master narrative pacing, voice, dialogue subtext, and worldbuilding techniques.
+          </p>
+        </div>
+        <button className="btn btn--ghost btn--sm" onClick={() => navigate('/studio/masterclasses')}>
+          View All ({MASTERCLASSES.length}) <ChevronRight size={14} />
+        </button>
+      </div>
+
+      <div className="masterclasses-grid" style={{ marginBottom: 30 }}>
+        {MASTERCLASSES.slice(0, 2).map((mc) => (
+          <article
+            key={mc.id}
+            className="masterclass-card"
+            onClick={() => navigate(`/studio/masterclasses/${mc.id}`)}>
+            <div className="masterclass-card__top">
+              <span className="tag">{mc.category}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{mc.readTime} min read</span>
+            </div>
+            <h3 className="masterclass-card__title">{mc.title}</h3>
+            <p className="masterclass-card__sub">{mc.subtitle}</p>
+            <div className="masterclass-card__instructor">
+              <span>{mc.instructor}</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--accent)', fontWeight: 600 }}>{mc.level}</span>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
+  )
+}
+
+// ── Novel Card for Studio ─────────────────────────────────────────────────
+function NovelCard({ story: s }: { story: Story }) {
+  const { navigate, deleteStory, saveStory } = useApp()
+  const { success } = useToast()
+  const [confirm, setConfirm] = useState(false)
+
+  function handleExport() {
+    let fullText = `${s.title.toUpperCase()}\nby ${s.author}\n\n${s.description || ''}\n\n${'='.repeat(40)}\n\n`
+    s.chapters.forEach((ch, i) => {
+      fullText += `CHAPTER ${i + 1}: ${ch.title}\n\n${ch.body}\n\n${'-'.repeat(30)}\n\n`
+    })
+
+    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-manuscript.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    success(`"${s.title}" downloaded as .txt`)
+  }
+
+  function handleAddChapter() {
+    const id = `ch-${s.id}-${Date.now()}`
+    const num = s.chapters.length + 1
+    const newCh: Chapter = { id, storyId: s.id, number: num, title: `Chapter ${num}`, body: '', note: '', status: 'Draft', wordCount: 0, createdAt: Date.now(), updatedAt: Date.now() }
+    const updated: Story = { ...s, chapters: [...s.chapters, newCh], updatedAt: Date.now() }
+    saveStory(updated)
+    success(`Chapter ${num} added`)
+    navigate(`/studio/edit/${s.id}`)
+  }
+
+  return (
+    <>
+      {confirm && (
+        <ConfirmModal
+          title={`Delete "${s.title}"?`}
+          body="This will permanently delete the manuscript and all its chapters."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { deleteStory(s.id); success('Manuscript deleted') }}
+          onCancel={() => setConfirm(false)}
+        />
+      )}
+      <div className="novel-card">
+        <div className="novel-card__head">
+          <StoryCover story={s} size="sm" onClick={() => navigate(`/studio/edit/${s.id}`)} />
+          <div className="novel-card__body">
+            <h3 className="novel-card__title" onClick={() => navigate(`/studio/edit/${s.id}`)} style={{ cursor: 'pointer' }}>
+              {s.title}
+            </h3>
+            <p className="novel-card__meta">
+              {s.genre} · {s.chapters.length} chapters · {s.totalWords.toLocaleString()} words
+            </p>
+            <span className={`status-badge status-badge--${s.status.toLowerCase()}`}>
+              {s.status}
+            </span>
+          </div>
+        </div>
+        <p className="novel-card__desc">
+          {s.description || 'No summary entered. Click Write to start drafting your chapters.'}
+        </p>
+        <div className="novel-card__footer">
+          <div className="novel-card__actions">
+            <button className="btn btn--primary btn--xs" onClick={() => navigate(`/studio/edit/${s.id}`)}>
+              <PenLine size={12} /> Write
+            </button>
+            <button className="btn btn--ghost btn--xs" onClick={() => navigate(`/studio/preview/${s.id}`)}>
+              <BookOpen size={12} /> Preview
+            </button>
+            <button className="btn btn--ghost btn--xs" onClick={handleAddChapter} title="Add Chapter">
+              <Plus size={12} /> Chapter
+            </button>
+            <button className="btn btn--ghost btn--xs" onClick={handleExport} title="Download .txt">
+              <Download size={12} />
+            </button>
+          </div>
+          <button className="icon-btn icon-btn--xs icon-btn--danger" onClick={() => setConfirm(true)} aria-label="Delete novel">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -1555,6 +2015,23 @@ function StoryRow({ story: s }: { story: Story }) {
   const { navigate, deleteStory } = useApp()
   const { success } = useToast()
   const [confirm, setConfirm] = useState(false)
+
+  function handleExport() {
+    let fullText = `${s.title.toUpperCase()}\nby ${s.author}\n\n${s.description || ''}\n\n${'='.repeat(40)}\n\n`
+    s.chapters.forEach((ch, i) => {
+      fullText += `CHAPTER ${i + 1}: ${ch.title}\n\n${ch.body}\n\n${'-'.repeat(30)}\n\n`
+    })
+
+    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-manuscript.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    success(`"${s.title}" downloaded as .txt`)
+  }
+
   return (
     <>
       {confirm && <ConfirmModal title={`Delete "${s.title}"?`} body="This will permanently delete the story and all its chapters." confirmLabel="Delete" danger onConfirm={() => { deleteStory(s.id); success('Story deleted') }} onCancel={() => setConfirm(false)} />}
@@ -1566,6 +2043,8 @@ function StoryRow({ story: s }: { story: Story }) {
         </div>
         <div className="story-row__actions">
           <button className="btn btn--primary btn--sm" onClick={() => navigate(`/studio/edit/${s.id}`)}>Edit</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate(`/studio/preview/${s.id}`)}><BookOpen size={13} /> Preview</button>
+          <button className="btn btn--ghost btn--icon-only" onClick={handleExport} title="Download .txt"><Download size={13} /></button>
           <button className="btn btn--ghost btn--icon-only" aria-label="Delete story" onClick={() => setConfirm(true)}><Trash2 size={14} /></button>
         </div>
       </div>
@@ -1854,6 +2333,9 @@ function StoryEditor() {
                 </span>
               </div>
               <div className="editor-toolbar__right">
+                <button className="btn btn--sm btn--ghost" onClick={() => navigate(`/studio/preview/${story.id}`)} title="Preview as printed book">
+                  <BookOpen size={14} /> Preview Book
+                </button>
                 <button className={`btn btn--sm ${isRecording ? 'btn--recording' : 'btn--ghost'}`} onClick={dictate} aria-label={isRecording ? 'Stop recording' : 'Dictate'}>
                   {isRecording ? <><MicOff size={14} /> Stop</> : <><Mic size={14} /> Dictate</>}
                 </button>
@@ -1882,6 +2364,11 @@ function StoryEditor() {
                 <span>{activeWords.toLocaleString()} words in this chapter</span>
                 <span>{readTime(activeWords)} min read</span>
                 <span>Total: {totalWords.toLocaleString()} words</span>
+              </div>
+
+              {/* Mira Craft Coach Diagnostic Assistant */}
+              <div style={{ marginTop: 24 }}>
+                <MiraCraftCoach currentText={chapter.body} chapterTitle={chapter.title} />
               </div>
             </div>
           </>

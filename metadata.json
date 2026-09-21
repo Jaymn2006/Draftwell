@@ -1,0 +1,10 @@
+{
+  "name": "Draftwell",
+  "description": "A living home for stories, readers, and writers. Read, write, and publish original fiction.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

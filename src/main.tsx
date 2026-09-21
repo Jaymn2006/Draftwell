@@ -188,8 +188,9 @@ function AuthScreen({ onOffline }: { onOffline: () => void }) {
     setMessage('')
     try {
       if (mode === 'forgot') {
+        const base = import.meta.env.BASE_URL.replace(/\/$/, '')
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/Draftwell/`,
+          redirectTo: `${window.location.origin}${base}/`,
         })
         if (error) throw error
         setMessage('Check your email for a password reset link.')
@@ -293,61 +294,30 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 // ROOT APP — auth gate + context providers + route dispatch
 // ══════════════════════════════════════════════════════════════════════════
 function App() {
-  // ── Boot: show skeleton immediately, skip intro if seen this session ──
-  const alreadySeen = sessionStorage.getItem('draftwell-intro-seen') === 'true'
-  const [introDone, setIntroDone] = useState(alreadySeen)
-  const [booted, setBooted] = useState(alreadySeen) // shell skeleton fallback
-
-  // Intro: max 800ms (down from 3200ms)
-  useEffect(() => {
-    if (introDone) return
-    // Show shell skeleton after 200ms regardless (prevents blank screen)
-    const skelTimer = window.setTimeout(() => setBooted(true), 200)
-    // Complete intro at 800ms
-    const introTimer = window.setTimeout(() => {
-      sessionStorage.setItem('draftwell-intro-seen', 'true')
-      setIntroDone(true)
-    }, 800)
-    return () => { window.clearTimeout(skelTimer); window.clearTimeout(introTimer) }
-  }, [introDone])
-
-  // ── Auth ──────────────────────────────────────────────────────────────
-  // Start unauthenticated — always show login screen first unless in offline mode
-  const [authenticated, setAuthenticated] = useState(
-    () => localStorage.getItem('draftwell-offline-mode') === 'true'
-  )
-  const [userId, setUserId] = useState<string | null>(
-    () => localStorage.getItem('draftwell-offline-mode') === 'true' ? offlineUserId : null
-  )
+  // ── Auth & Local-first state ──────────────────────────────────────────
+  const [authenticated, setAuthenticated] = useState<boolean>(true)
+  const [userId, setUserId] = useState<string | null>(() => {
+    return localStorage.getItem('draftwell-user-id') || offlineUserId
+  })
   const [privateReady, setPrivateReady] = useState(false)
 
   useEffect(() => {
-    if (localStorage.getItem('draftwell-offline-mode') === 'true') {
-      setAuthenticated(true)
-      setUserId(offlineUserId)
-      return
-    }
-    if (!supabase) {
-      // Supabase not configured — stay on auth screen so user can choose offline mode
-      return
-    }
+    if (!supabase) return
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+      if (data?.session) {
         setAuthenticated(true)
         setUserId(data.session.user.id)
-      } else {
-        // No session — show login screen
-        setAuthenticated(false)
-        setUserId(null)
+        localStorage.setItem('draftwell-user-id', data.session.user.id)
       }
     }).catch(() => {
-      // Session check failed — show login screen, don't auto-bypass auth
-      setAuthenticated(false)
-      setUserId(null)
+      // Offline fallback is already active
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthenticated(Boolean(session))
-      setUserId(session?.user.id ?? null)
+      if (session?.user) {
+        setAuthenticated(true)
+        setUserId(session.user.id)
+        localStorage.setItem('draftwell-user-id', session.user.id)
+      }
       setPrivateReady(false)
     })
     return () => listener.subscription.unsubscribe()
@@ -359,53 +329,37 @@ function App() {
   }, [userId])
 
   // ── Route ─────────────────────────────────────────────────────────────
-  const [route, setRoute] = useState(() => {
-    const p = window.location.pathname.replace('/Draftwell', '') || '/home'
+  const getNormalizedRoute = () => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    let p = window.location.pathname
+    if (base && p.startsWith(base)) {
+      p = p.slice(base.length)
+    } else if (p.startsWith('/Draftwell')) {
+      p = p.slice('/Draftwell'.length)
+    }
+    p = p || '/home'
     return p === '/' ? '/home' : p
-  })
+  }
+
+  const [route, setRoute] = useState(getNormalizedRoute)
 
   useEffect(() => {
     const handler = () => {
-      const p = window.location.pathname.replace('/Draftwell', '') || '/home'
-      setRoute(p === '/' ? '/home' : p)
+      setRoute(getNormalizedRoute())
     }
     window.addEventListener('popstate', handler)
     return () => window.removeEventListener('popstate', handler)
   }, [])
 
   function navigate(nextRoute: string) {
-    const full = `/Draftwell${nextRoute}`
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const full = `${base}${nextRoute}` || '/'
     window.history.pushState({}, '', full)
     setRoute(nextRoute)
     window.scrollTo(0, 0)
   }
 
-  // ── Show boot skeleton during intro (prevents blank screen) ───────────
-  if (!introDone && !booted) return <IntroScreen />
-  if (!introDone && booted) return <BootSkeleton />
-  if (!authenticated) {
-    return (
-      <AuthScreen onOffline={() => {
-        localStorage.setItem('draftwell-offline-mode', 'true')
-        setUserId(offlineUserId)
-        setPrivateReady(false)
-        setAuthenticated(true)
-      }} />
-    )
-  }
-
-  // ── Studio route — legacy Mira editor ─────────────────────────────────
-  if (route === '/studio') {
-    return (
-      <ToastProvider>
-        <AppProvider userId={userId} authenticated={authenticated} setAuthenticated={setAuthenticated} setUserId={setUserId}>
-          <StudioShellLegacy userId={userId} authenticated={authenticated} setAuthenticated={setAuthenticated} setUserId={setUserId} navigate={navigate} privateReady={privateReady} setPrivateReady={setPrivateReady} />
-        </AppProvider>
-      </ToastProvider>
-    )
-  }
-
-  // ── Product shell — full reader/discovery platform ────────────────────
+  // ── Product shell — full reader, writer dashboard, and discovery platform ──
   return (
     <ToastProvider>
       <AppProvider userId={userId} authenticated={authenticated} setAuthenticated={setAuthenticated} setUserId={setUserId}>

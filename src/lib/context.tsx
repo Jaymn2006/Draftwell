@@ -117,10 +117,20 @@ export function AppProvider({ userId, authenticated, setAuthenticated, setUserId
   const [ratings, setRatings] = useState<Rating[]>(() => loadRatings(uid))
   const [likes, setLikes] = useState<string[]>(() => loadLikes(uid))
   const [syncStatus, setSyncStatus] = useState<AppContextValue['syncStatus']>('saved')
-  const [route, setRoute] = useState(() => {
-    const p = window.location.pathname.replace('/Draftwell', '') || '/home'
+
+  const getNormalizedRoute = () => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    let p = window.location.pathname
+    if (base && p.startsWith(base)) {
+      p = p.slice(base.length)
+    } else if (p.startsWith('/Draftwell')) {
+      p = p.slice('/Draftwell'.length)
+    }
+    p = p || '/home'
     return p === '/' ? '/home' : p
-  })
+  }
+
+  const [route, setRoute] = useState(getNormalizedRoute)
   const notifCounter = useRef(0)
 
   // Re-load when user changes
@@ -143,15 +153,15 @@ export function AppProvider({ userId, authenticated, setAuthenticated, setUserId
   // Browser back/forward
   useEffect(() => {
     const handler = () => {
-      const p = window.location.pathname.replace('/Draftwell', '') || '/home'
-      setRoute(p === '/' ? '/home' : p)
+      setRoute(getNormalizedRoute())
     }
     window.addEventListener('popstate', handler)
     return () => window.removeEventListener('popstate', handler)
   }, [])
 
   const navigate = useCallback((path: string) => {
-    const full = `/Draftwell${path}`
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const full = `${base}${path}` || '/'
     window.history.pushState({}, '', full)
     setRoute(path)
     window.scrollTo(0, 0)
