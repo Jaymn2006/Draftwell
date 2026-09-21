@@ -243,7 +243,7 @@ export class SupabaseService {
     // Client-side validation boundaries
     const validated: Partial<UIPreferences> = {}
 
-    if (settings.theme_mode && ['dark', 'light', 'amber', 'eye'].includes(settings.theme_mode)) {
+    if (settings.theme_mode && ['dark', 'light', 'amber', 'eye', 'sepia', 'oled'].includes(settings.theme_mode)) {
       validated.theme_mode = settings.theme_mode
     }
     if (settings.font_family && ['serif', 'sans'].includes(settings.font_family)) {

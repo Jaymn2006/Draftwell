@@ -20,8 +20,10 @@ import { MobileDrawer } from './components/MobileDrawer'
 import { BookPreviewView } from './components/BookPreview'
 import { MasterclassesView } from './components/MasterclassesView'
 import { MiraCraftCoach } from './components/MiraCraftCoach'
-import { LazyCover } from './components/LazyImage'
+import { LazyCover, LazyNovelCover } from './components/LazyImage'
+import { ApplicationShell } from './components/ApplicationShell'
 import { fetchSampleCoversFromBoard, pinterestCoverService } from './lib/pinterestCoverService'
+import { getCoverForBook } from './lib/bookCovers'
 import { supabase } from './lib/supabase'
 import { logOutFirebase } from './lib/firebase'
 import type { Chapter, Comment, ReaderTheme, Story, StoryStatus, Theme } from './lib/types'
@@ -52,23 +54,17 @@ function timeAgo(ms: number) {
 
 // ── Cover component ───────────────────────────────────────────────────────
 function StoryCover({ story, onClick, size = 'md' }: { story: Story; onClick?: () => void; size?: 'sm' | 'md' | 'lg' }) {
-  const cls = `story-cover story-cover--${size}${onClick ? ' story-cover--btn' : ''}`
-  const style = story.coverImage
-    ? { backgroundImage: `url("${story.coverImage}")`, backgroundColor: story.coverColor || '#1a1612' }
-    : { background: story.coverGradient ?? story.coverColor }
-  const content = (
-    <div className="story-cover__inner">
-      <span className="story-cover__title">{story.title}</span>
-      <span className="story-cover__author">{story.author}</span>
-    </div>
-  )
+  const resolvedCover = story.coverImage || getCoverForBook(story.title) || getCoverForBook(story.id)
   return (
-    <LazyCover className={`lazy-cover--${size}`} minHeight={size === 'sm' ? 84 : size === 'lg' ? 220 : 140}>
-      {onClick
-        ? <button className={cls} style={style} onClick={onClick} aria-label={`Open ${story.title}`}>{content}</button>
-        : <div className={cls} style={style}>{content}</div>
-      }
-    </LazyCover>
+    <LazyNovelCover
+      title={story.title}
+      author={story.author}
+      coverImage={resolvedCover}
+      coverColor={story.coverColor}
+      coverGradient={story.coverGradient}
+      size={size}
+      onClick={onClick}
+    />
   )
 }
 
@@ -146,26 +142,7 @@ function ConfirmModal({ title, body, confirmLabel = 'Confirm', danger = false, o
 // ══════════════════════════════════════════════════════════════════════════
 export function ProductShell() {
   const app = useApp()
-  const { route, navigate, settings, notifications, unreadCount, markAllRead } = app
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const profileRef = useRef<HTMLDivElement>(null)
-
-  // Close profile menu on outside click
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileMenuOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => { setSidebarOpen(false) }, [route])
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
-    if (searchQuery.trim()) navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
-  }
+  const { route, navigate, settings, unreadCount } = app
 
   const isReader = route.startsWith('/read/')
   if (isReader) return <ReaderPage />
@@ -176,177 +153,41 @@ export function ProductShell() {
     app.updateSettings({ theme: sequence[nextIdx] })
   }
 
+  function handleSignOut() {
+    if (supabase) void supabase.auth.signOut()
+    void logOutFirebase()
+    localStorage.removeItem('draftwell-offline-mode')
+    app.setAuthenticated(false)
+    app.setUserId(null)
+  }
+
   return (
-    <div className="shell" style={{ '--accent': settings.accent } as React.CSSProperties}
-      data-sidebar={sidebarOpen ? 'open' : 'closed'}>
-
-      {/* Slideout Mobile Drawer */}
-      <MobileDrawer isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      {/* TOP BAR */}
-      <header className="topbar">
-        <button className="topbar__menu-btn icon-btn" aria-label="Toggle menu" onClick={() => setSidebarOpen(true)}>
-          <PanelLeft size={20} />
-        </button>
-        <button className="topbar__brand" onClick={() => navigate('/home')} aria-label="Draftwell home">
-          <BrandMark size={26} />
-          <span className="topbar__brand-name">Draftwell</span>
-        </button>
-        <form className="topbar__search" onSubmit={handleSearch} role="search">
-          <Search size={15} />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search titles, authors, worlds…" aria-label="Search" />
-        </form>
-        <div className="topbar__actions">
-          {/* Quick theme switcher */}
-          <button className="topbar__theme-toggle" aria-label={`Theme: ${settings.theme}. Click to change`} onClick={cycleTheme} title={`Theme: ${settings.theme}`}>
-            {settings.theme === 'dark' && <Moon size={17} />}
-            {settings.theme === 'light' && <Sun size={17} />}
-            {settings.theme === 'amber' && <Palette size={17} />}
-            {settings.theme === 'eye' && <Leaf size={17} />}
-          </button>
-          <button className="icon-btn topbar__notif" aria-label="Notifications" onClick={() => navigate('/notifications')}>
-            <Bell size={18} />
-            {unreadCount > 0 && <span className="badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-          </button>
-          <div ref={profileRef} className="profile-wrap">
-            <button className="topbar__profile" aria-label="Profile menu" aria-expanded={profileMenuOpen}
-              onClick={() => setProfileMenuOpen((o) => !o)}>
-              <span className="avatar avatar--sm">{settings.name.slice(0, 2).toUpperCase()}</span>
-              <span className="topbar__profile-name">{settings.name}</span>
-            </button>
-            {profileMenuOpen && (
-              <div className="dropdown" role="menu">
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/profile') }}><UserCircle size={15} /> Profile</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/library') }}><Library size={15} /> My Library</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio') }}><PenLine size={15} /> Creator Studio</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio/preview') }}><BookOpen size={15} /> Live Book Preview</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/studio/masterclasses') }}><GraduationCap size={15} /> Masterclasses</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/settings') }}><Settings size={15} /> Settings</button>
-                <button role="menuitem" onClick={() => { setProfileMenuOpen(false); navigate('/help') }}><HelpCircle size={15} /> Help</button>
-                <div className="dropdown__divider" />
-                <button role="menuitem" className="dropdown__item--danger" onClick={() => {
-                  setProfileMenuOpen(false)
-                  if (supabase) void supabase.auth.signOut()
-                  void logOutFirebase()
-                  localStorage.removeItem('draftwell-offline-mode')
-                  app.setAuthenticated(false); app.setUserId(null)
-                }}><LogOut size={15} /> Sign out</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* SIDEBAR */}
-      <aside className="sidebar" aria-label="Main navigation">
-        <nav className="sidebar__nav">
-          <div className="sidebar__section-label">DISCOVER</div>
-          {([
-            ['/home', Home, 'Home'],
-            ['/discover', Compass, 'Discover'],
-            ['/rankings', Trophy, 'Rankings'],
-            ['/search', Search, 'Search'],
-          ] as const).map(([path, Icon, label]) => (
-            <button key={path} className={`sidebar__link${route === path || route.startsWith(path + '?') ? ' sidebar__link--active' : ''}`}
-              onClick={() => navigate(path)}>
-              <Icon size={16} />{label}
-            </button>
-          ))}
-          <div className="sidebar__section-label sidebar__section-label--mt">MY SHELF</div>
-          {([
-            ['/library', Library, 'Library', app.library.length],
-            ['/history', Clock, 'History', 0],
-            ['/following', Users, 'Following', app.follows.length],
-          ] as [string, React.ElementType, string, number][]).map(([path, Icon, label, count]) => (
-            <button key={path} className={`sidebar__link${route === path ? ' sidebar__link--active' : ''}`}
-              onClick={() => navigate(path)}>
-              <Icon size={16} />{label}
-              {count > 0 && <span className="sidebar__count">{count}</span>}
-            </button>
-          ))}
-          <div className="sidebar__section-label sidebar__section-label--mt">CREATOR STUDIO</div>
-          <button className={`sidebar__link${route === '/studio' ? ' sidebar__link--active' : ''}`}
-            onClick={() => navigate('/studio')}>
-            <BarChart2 size={16} />Dashboard
-          </button>
-          <button className={`sidebar__link${route.startsWith('/studio/write') || route.startsWith('/studio/edit') ? ' sidebar__link--active' : ''}`}
-            onClick={() => navigate('/studio/write/new')}>
-            <PenLine size={16} />Write Novel
-          </button>
-          <button className={`sidebar__link${route.startsWith('/studio/preview') ? ' sidebar__link--active' : ''}`}
-            onClick={() => navigate('/studio/preview')}>
-            <BookOpen size={16} />Book Preview
-          </button>
-          <button className={`sidebar__link${route.startsWith('/studio/masterclasses') ? ' sidebar__link--active' : ''}`}
-            onClick={() => navigate('/studio/masterclasses')}>
-            <GraduationCap size={16} />Masterclasses
-          </button>
-          <div className="sidebar__divider" />
-          <button className={`sidebar__link${route === '/settings' ? ' sidebar__link--active' : ''}`}
-            onClick={() => navigate('/settings')}>
-            <Settings size={16} />Settings
-          </button>
-        </nav>
-        <div className="sidebar__user">
-          <span className="avatar avatar--sm">{settings.name.slice(0, 2).toUpperCase()}</span>
-          <span className="sidebar__username">{settings.name}</span>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="shell__main">
-        {route === '/home' && <HomePage />}
-        {(route === '/discover' || route.startsWith('/discover?') || route.startsWith('/genre/')) && <DiscoverPage />}
-        {route === '/rankings' && <RankingsPage />}
-        {(route === '/search' || route.startsWith('/search?')) && <SearchPage />}
-        {route === '/library' && <LibraryPage />}
-        {route === '/history' && <HistoryPage />}
-        {route === '/following' && <FollowingPage />}
-        {route.startsWith('/story/') && <StoryDetailPage />}
-        {route.startsWith('/author/') && <AuthorPage />}
-        {route === '/notifications' && <NotificationsPage />}
-        {route === '/profile' && <ProfilePage />}
-        {route.startsWith('/settings') && <SettingsPage />}
-        {route === '/help' && <HelpPage />}
-        {route.startsWith('/studio') && <StudioShell />}
-        {!route.match(/^\/(home|discover|rankings|search|library|history|following|story|author|notifications|profile|settings|help|studio|read)/) && <NotFoundPage />}
-      </main>
-
-      {/* MOBILE BOTTOM NAV */}
-      <nav className="bottom-nav" aria-label="Mobile navigation">
-        <button className={`bottom-nav__item${route === '/home' ? ' bottom-nav__item--active' : ''}`}
-          onClick={() => navigate('/home')}>
-          <Home size={20} />
-          <span>Home</span>
-        </button>
-        <button className={`bottom-nav__item${route === '/discover' || route.startsWith('/discover') ? ' bottom-nav__item--active' : ''}`}
-          onClick={() => navigate('/discover')}>
-          <Compass size={20} />
-          <span>Discover</span>
-        </button>
-        <button className={`bottom-nav__item${route === '/search' || route.startsWith('/search') ? ' bottom-nav__item--active' : ''}`}
-          onClick={() => navigate('/search')}>
-          <Search size={20} />
-          <span>Search</span>
-        </button>
-        <button className={`bottom-nav__item${route.startsWith('/studio') ? ' bottom-nav__item--active' : ''}`}
-          onClick={() => navigate('/studio')}>
-          <PenLine size={20} />
-          <span>Studio</span>
-        </button>
-        <button className={`bottom-nav__item${route === '/library' ? ' bottom-nav__item--active' : ''}`}
-          onClick={() => navigate('/library')}>
-          <Library size={20} />
-          <span>Shelf</span>
-          {app.library.length > 0 && <span className="bottom-nav__badge">{app.library.length}</span>}
-        </button>
-        <button className="bottom-nav__item" onClick={() => setSidebarOpen(true)}>
-          <Menu size={20} />
-          <span>Menu</span>
-        </button>
-      </nav>
-    </div>
+    <ApplicationShell
+      settings={settings}
+      currentRoute={route}
+      unreadCount={unreadCount}
+      libraryCount={app.library.length}
+      followsCount={app.follows.length}
+      onNavigate={navigate}
+      onCycleTheme={cycleTheme}
+      onSignOut={handleSignOut}
+    >
+      {route === '/home' && <HomePage />}
+      {(route === '/discover' || route.startsWith('/discover?') || route.startsWith('/genre/')) && <DiscoverPage />}
+      {route === '/rankings' && <RankingsPage />}
+      {(route === '/search' || route.startsWith('/search?')) && <SearchPage />}
+      {route === '/library' && <LibraryPage />}
+      {route === '/history' && <HistoryPage />}
+      {route === '/following' && <FollowingPage />}
+      {route.startsWith('/story/') && <StoryDetailPage />}
+      {route.startsWith('/author/') && <AuthorPage />}
+      {route === '/notifications' && <NotificationsPage />}
+      {route === '/profile' && <ProfilePage />}
+      {route.startsWith('/settings') && <SettingsPage />}
+      {route === '/help' && <HelpPage />}
+      {route.startsWith('/studio') && <StudioShell />}
+      {!route.match(/^\/(home|discover|rankings|search|library|history|following|story|author|notifications|profile|settings|help|studio|read)/) && <NotFoundPage />}
+    </ApplicationShell>
   )
 }
 
@@ -591,7 +432,13 @@ function DiscoverPage() {
 
   const storiesWithCovers = useMemo(() => {
     return filtered.map((s, idx) => {
-      if (s.coverImage) return s
+      const assigned = s.coverImage || getCoverForBook(s.title) || getCoverForBook(s.id)
+      if (assigned) {
+        return {
+          ...s,
+          coverImage: assigned,
+        }
+      }
       if (pinterestCovers.length > 0) {
         return {
           ...s,

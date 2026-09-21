@@ -1,7 +1,9 @@
 // ── Draftwell demo stories — original fictional content ───────────────────
 import type { Story } from './types'
+import { BOOK_COVER_MAP } from './bookCovers'
+import { enhanceStoryWith100Chapters } from './storyEngine'
 
-export const DEMO_STORIES: Story[] = [
+const RAW_DEMO_STORIES: Story[] = [
   {
     id: 'demo-1',
     userId: 'demo',
@@ -13,6 +15,7 @@ export const DEMO_STORIES: Story[] = [
     status: 'Ongoing',
     coverColor: '#a95748',
     coverGradient: 'linear-gradient(145deg, #a95748, #5d3443 70%, #17354c)',
+    coverImage: BOOK_COVER_MAP['demo-1'],
     isOwn: false,
     reads: 14200,
     rating: 4.7,
@@ -141,6 +144,7 @@ So she did.`,
     status: 'Ongoing',
     coverColor: '#1a3a5c',
     coverGradient: 'linear-gradient(145deg, #1a3a5c, #0d2137 60%, #2a1f4a)',
+    coverImage: BOOK_COVER_MAP['demo-2'],
     isOwn: false,
     reads: 28900,
     rating: 4.5,
@@ -279,6 +283,7 @@ A burst of static. Then, from somewhere in the building above her, footsteps on 
     status: 'Completed',
     coverColor: '#2d5a3d',
     coverGradient: 'linear-gradient(145deg, #2d5a3d, #1a3828 60%, #3d4a2a)',
+    coverImage: BOOK_COVER_MAP['demo-3'],
     isOwn: false,
     reads: 52300,
     rating: 4.9,
@@ -372,6 +377,7 @@ Her mother brought the tea and sat across from her and folded her hands around h
     status: 'Ongoing',
     coverColor: '#2c2c3e',
     coverGradient: 'linear-gradient(145deg, #2c2c3e, #1a1a2e 60%, #16213e)',
+    coverImage: BOOK_COVER_MAP['demo-4'],
     isOwn: false,
     reads: 37800,
     rating: 4.6,
@@ -461,6 +467,7 @@ She had time.`,
     status: 'Ongoing',
     coverColor: '#0d1b3e',
     coverGradient: 'linear-gradient(145deg, #0d1b3e, #050d20 60%, #1a1040)',
+    coverImage: BOOK_COVER_MAP['demo-5'],
     isOwn: false,
     reads: 21400,
     rating: 4.4,
@@ -513,6 +520,7 @@ She opened it again immediately.`,
     status: 'Completed',
     coverColor: '#3d5a2a',
     coverGradient: 'linear-gradient(145deg, #3d5a2a, #2a3d1a 60%, #4a5a30)',
+    coverImage: BOOK_COVER_MAP['demo-6'],
     isOwn: false,
     reads: 44100,
     rating: 4.8,
@@ -573,6 +581,7 @@ That had never happened before.`,
     status: 'Completed',
     coverColor: '#1a1a1a',
     coverGradient: 'linear-gradient(145deg, #1a1a1a, #0d0d0d 60%, #2a1a2a)',
+    coverImage: BOOK_COVER_MAP['demo-7'],
     isOwn: false,
     reads: 18700,
     rating: 4.3,
@@ -625,6 +634,7 @@ She did not look through him. People generally looked through him. Instead she l
     status: 'Ongoing',
     coverColor: '#7a3d5a',
     coverGradient: 'linear-gradient(145deg, #7a3d5a, #5a2a45 60%, #3d1a30)',
+    coverImage: BOOK_COVER_MAP['demo-8'],
     isOwn: false,
     reads: 31500,
     rating: 4.6,
@@ -669,6 +679,8 @@ She especially did not tell him that she had started writing back — anonymousl
     ],
   },
 ]
+
+export const DEMO_STORIES: Story[] = RAW_DEMO_STORIES.map(enhanceStoryWith100Chapters)
 
 // ── Demo authors ──────────────────────────────────────────────────────────
 export const DEMO_AUTHORS = [

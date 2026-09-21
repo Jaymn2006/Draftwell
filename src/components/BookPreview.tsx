@@ -190,7 +190,17 @@ export function BookPreviewView({ initialStoryId }: BookPreviewProps) {
       <div className="book-stage">
         <div className={`physical-book physical-book--${theme}`}>
           {showCover ? (
-            <div className="book-cover-stage" style={{ background: currentStory.coverGradient ?? currentStory.coverColor, color: '#fff' }}>
+            <div
+              className="book-cover-stage"
+              style={{
+                background: currentStory.coverImage
+                  ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.75)), url("${currentStory.coverImage}")`
+                  : (currentStory.coverGradient ?? currentStory.coverColor),
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                color: '#fff',
+              }}
+            >
               <span style={{ letterSpacing: 3, textTransform: 'uppercase', fontSize: 11, opacity: 0.8, marginBottom: 20 }}>
                 {currentStory.genre} · {currentStory.status}
               </span>

@@ -3,7 +3,7 @@
 export type NovelStatus = 'ongoing' | 'completed' | 'hiatus'
 
 export interface UIPreferences {
-  theme_mode: 'dark' | 'light' | 'amber' | 'eye'
+  theme_mode: 'dark' | 'light' | 'amber' | 'eye' | 'sepia' | 'oled'
   font_family: 'serif' | 'sans'
   font_size: number
   line_height: number

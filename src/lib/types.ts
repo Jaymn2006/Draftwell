@@ -1,6 +1,6 @@
 // ── Draftwell shared types ────────────────────────────────────────────────
 
-export type Theme = 'light' | 'dark' | 'amber' | 'eye'
+export type Theme = 'light' | 'dark' | 'amber' | 'eye' | 'sepia' | 'oled'
 export type Font = 'serif' | 'sans'
 export type ReaderTheme = 'draftwell' | 'paper' | 'midnight' | 'sepia' | 'eink'
 export type StoryStatus = 'Draft' | 'Ongoing' | 'Completed' | 'Archived'
