@@ -1,23 +1,13 @@
-# Dependencies
 node_modules/
-
-# Build output
-dist/
-dist-ssr/
-
-# Environment files — NEVER commit these, they contain secret API keys
+.next/
 .env
 .env.local
-.env.*.local
-
-# Vite / TS build artifacts
-*.tsbuildinfo
-vite.config.d.ts
-
-# Editor
-.vscode/
-.idea/
-
-# OS
+.env*.local
+dist/
+build/
+backend/cpp/build/
+*.user
+bin/
+obj/
 .DS_Store
-Thumbs.db
+*.log
