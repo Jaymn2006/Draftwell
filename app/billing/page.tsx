@@ -2,28 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { DraftwellFintech } from '@/components/DraftwellFintech';
-import { supabase } from '@/lib/supabase';
+import { ensureAnonymousUser } from '@/lib/firebase';
 
 export default function BillingPage() {
-  const [userId, setUserId] = useState<string>('');
-
+  const [userId, setUserId] = useState('');
   useEffect(() => {
-    async function resolve() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-      } else {
-        const guest = localStorage.getItem('draftwell_guest_id') || crypto.randomUUID();
-        localStorage.setItem('draftwell_guest_id', guest);
-        setUserId(guest);
-      }
-    }
-    resolve();
+    ensureAnonymousUser().then((u) => setUserId(u.uid));
   }, []);
-
-  if (!userId) {
-    return <div style={{ padding: '40px' }}>Preparing billing terminal...</div>;
-  }
-
+  if (!userId) return <p style={{ padding: 24 }}>Loading wallet session…</p>;
   return <DraftwellFintech userId={userId} />;
 }
