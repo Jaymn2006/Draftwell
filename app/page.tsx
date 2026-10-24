@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listNovels, ensureAnonymousUser, type Novel } from '@/lib/firebase';
+import { sampleNovels } from '@/lib/sampleBooks';
 
 export default function LibraryPage() {
   const [novels, setNovels] = useState<Novel[]>([]);
@@ -25,12 +26,26 @@ export default function LibraryPage() {
     load();
   }, []);
 
+  const allBooks = [
+    ...sampleNovels.map((s) => ({
+      id: s.id,
+      title: s.title,
+      author_name: s.author_name,
+      synopsis: s.synopsis,
+      cover_image_url: s.cover_image_url,
+      genre: s.genre,
+      status: s.status,
+      creator_id: 'sample',
+    })),
+    ...novels,
+  ];
+
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 20px' }}>
       <h1 style={{ marginTop: 0, color: '#111827' }}>Draftwell Library</h1>
       <p style={{ color: '#6b7280', marginBottom: '28px' }}>
-        Discover serialized novels. Open any title to enter the infinite-scroll reader canvas with
-        paragraph-level bookmarks.
+        Discover serialized novels. Start with our sample adventures, or open any title to enter the reader.
+        Ready to write your own? Visit the <Link href="/author" style={{ color: '#e67e22' }}>Author Studio</Link>.
       </p>
 
       {userId && (
@@ -51,14 +66,6 @@ export default function LibraryPage() {
 
       {loading ? (
         <p>Loading catalog...</p>
-      ) : novels.length === 0 ? (
-        <p style={{ color: '#6b7280' }}>
-          No novels yet. Authors can publish from the{' '}
-          <Link href="/author" style={{ color: '#e67e22' }}>
-            Author Console
-          </Link>
-          .
-        </p>
       ) : (
         <div
           style={{
@@ -67,7 +74,7 @@ export default function LibraryPage() {
             gap: '20px'
           }}
         >
-          {novels.map((n) => (
+          {allBooks.map((n) => (
             <Link
               key={n.id}
               href={`/read/${n.id}/1`}
@@ -87,8 +94,8 @@ export default function LibraryPage() {
                   n.cover_image_url ||
                   'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80'
                 }
-                alt={n.title}
-                style={{ width: '100%', height: '160px', objectFit: 'cover' }}
+                alt={`${n.title} by ${n.author_name}`}
+                style={{ width: '100%', height: '280px', objectFit: 'cover' }}
               />
               <div style={{ padding: '14px' }}>
                 <div style={{ fontSize: '12px', color: '#e67e22', fontWeight: 600 }}>{n.genre}</div>
