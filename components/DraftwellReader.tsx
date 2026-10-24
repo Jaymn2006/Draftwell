@@ -12,6 +12,7 @@ import {
   saveBookmark,
   type Chapter
 } from '@/lib/firebase';
+import { getSampleChapter } from '@/lib/sampleBooks';
 
 interface DraftwellReaderProps {
   novelId: string;
@@ -34,6 +35,26 @@ export const DraftwellReader: React.FC<DraftwellReaderProps> = ({ novelId, chapt
     try {
       const user = await ensureAnonymousUser();
       setUserId(user.uid);
+
+      if (novelId.startsWith('sample-')) {
+        const sampleChap = getSampleChapter(novelId, chapterNum);
+        if (sampleChap) {
+          setChapter({
+            id: `${novelId}-${chapterNum}`,
+            novel_id: novelId,
+            chapter_number: sampleChap.chapter_number,
+            title: sampleChap.title,
+            content: sampleChap.content,
+            is_premium: false,
+            coin_cost: 0,
+            star_cost: 0,
+          });
+          setUnlocked(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       const chapData = await getChapter(novelId, chapterNum);
       if (!chapData) {
         setChapter(null);
@@ -61,7 +82,7 @@ export const DraftwellReader: React.FC<DraftwellReaderProps> = ({ novelId, chapt
   }, [fetchContentAndAccessState]);
 
   const processPremiumGateUnlock = async () => {
-    if (!chapter || !userId) return;
+    if (!chapter || !userId || novelId.startsWith('sample-')) return;
     try {
       await unlockWithCoins(userId, chapter.id, chapter.coin_cost, novelId, chapterNum);
       setUserCoins((c) => c - chapter.coin_cost);
@@ -72,7 +93,7 @@ export const DraftwellReader: React.FC<DraftwellReaderProps> = ({ novelId, chapt
   };
 
   const processStarUnlock = async () => {
-    if (!chapter || !userId) return;
+    if (!chapter || !userId || novelId.startsWith('sample-')) return;
     try {
       await unlockWithStars(userId, chapter.id, chapter.star_cost, novelId, chapterNum);
       setUserStars((s) => s - chapter.star_cost);
@@ -83,7 +104,7 @@ export const DraftwellReader: React.FC<DraftwellReaderProps> = ({ novelId, chapt
   };
 
   const saveLiveParagraphBookmark = async (paraIdx: number) => {
-    if (!userId) return;
+    if (!userId || novelId.startsWith('sample-')) return;
     setActiveBookmark(paraIdx);
     await saveBookmark(userId, novelId, chapterNum, paraIdx);
   };
@@ -99,7 +120,7 @@ export const DraftwellReader: React.FC<DraftwellReaderProps> = ({ novelId, chapt
     return <div style={{ color: '#888', padding: '30px', fontFamily: 'sans-serif' }}>Assembling narrative context layers...</div>;
   }
   if (!chapter) {
-    return <div style={{ color: '#888', padding: '30px', fontFamily: 'sans-serif' }}>Chapter not found. Publish content from the Author Console.</div>;
+    return <div style={{ color: '#888', padding: '30px', fontFamily: 'sans-serif' }}>Chapter not found. Publish content from the Author Studio or try a sample book.</div>;
   }
 
   return (
