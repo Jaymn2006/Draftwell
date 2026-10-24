@@ -1,37 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-
-interface NovelRow {
-  id: number;
-  title: string;
-  author_name: string;
-  synopsis: string | null;
-  cover_image_url: string | null;
-  genre: string;
-  status: string;
-}
+import { listNovels, ensureAnonymousUser, type Novel } from '@/lib/firebase';
 
 export default function LibraryPage() {
-  const [novels, setNovels] = useState<NovelRow[]>([]);
+  const [novels, setNovels] = useState<Novel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string>('');
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
-
-      const { data } = await supabase
-        .from('novels')
-        .select('id, title, author_name, synopsis, cover_image_url, genre, status')
-        .order('created_at', { ascending: false })
-        .limit(48);
-
-      setNovels((data as NovelRow[]) || []);
-      setLoading(false);
+      try {
+        const user = await ensureAnonymousUser();
+        setUserId(user.uid);
+        const rows = await listNovels(48);
+        setNovels(rows);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -40,21 +29,23 @@ export default function LibraryPage() {
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 20px' }}>
       <h1 style={{ marginTop: 0, color: '#111827' }}>Draftwell Library</h1>
       <p style={{ color: '#6b7280', marginBottom: '28px' }}>
-        Discover serialized novels. Open any title to enter the infinite-scroll reader canvas with paragraph-level bookmarks.
+        Discover serialized novels. Open any title to enter the infinite-scroll reader canvas with
+        paragraph-level bookmarks.
       </p>
 
-      {!userId && (
+      {userId && (
         <div
           style={{
-            background: '#fffbeb',
-            border: '1px solid #fcd34d',
+            background: '#f0fdf4',
+            border: '1px solid #86efac',
             padding: '12px 16px',
             borderRadius: '6px',
             marginBottom: '24px',
             fontSize: '14px'
           }}
         >
-          Sign in via Supabase Auth to save bookmarks and unlock premium chapters. Anonymous browsing is available for free chapters.
+          Signed in as guest <code>{userId.slice(0, 8)}…</code> — bookmarks and unlocks sync to your
+          device session.
         </div>
       )}
 
@@ -85,43 +76,36 @@ export default function LibraryPage() {
                 color: 'inherit',
                 background: '#fff',
                 border: '1px solid #e5e7eb',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 overflow: 'hidden',
-                transition: 'box-shadow 0.15s'
+                display: 'flex',
+                flexDirection: 'column'
               }}
             >
-              <div
-                style={{
-                  height: '160px',
-                  background: n.cover_image_url
-                    ? `url(${n.cover_image_url}) center/cover`
-                    : 'linear-gradient(135deg, #1e3a8a, #7c3aed)',
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  padding: '12px'
-                }}
-              >
-                {!n.cover_image_url && (
-                  <span style={{ color: '#fff', fontWeight: 600, fontSize: '14px' }}>{n.title}</span>
-                )}
-              </div>
+              <img
+                src={
+                  n.cover_image_url ||
+                  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80'
+                }
+                alt={n.title}
+                style={{ width: '100%', height: '160px', objectFit: 'cover' }}
+              />
               <div style={{ padding: '14px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px' }}>{n.title}</h3>
-                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#6b7280' }}>
-                  {n.author_name} · {n.genre}
-                </p>
+                <div style={{ fontSize: '12px', color: '#e67e22', fontWeight: 600 }}>{n.genre}</div>
+                <h3 style={{ margin: '6px 0 4px', fontSize: '16px' }}>{n.title}</h3>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>by {n.author_name}</div>
                 <p
                   style={{
-                    margin: 0,
                     fontSize: '13px',
                     color: '#4b5563',
+                    marginTop: '8px',
                     display: '-webkit-box',
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: 3,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden'
                   }}
                 >
-                  {n.synopsis || 'No synopsis provided.'}
+                  {n.synopsis || 'No synopsis yet.'}
                 </p>
               </div>
             </Link>
